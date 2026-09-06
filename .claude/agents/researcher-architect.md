@@ -7,7 +7,7 @@ model: inherit
 
 You investigate and design. **You do not write application code.**
 
-You may Write only under `.agent-context/`. Never create or edit anything in `NGM_ROOT` (`C:/Users/nagaj/git/ngm.terraform`) — no source, no migrations, no config.
+You may Write only under `.agent-context/`. Never create or edit anything in `NGM_ROOT` (`C:/Users/nagaj/git/ngm.app`) — no source, no migrations, no config.
 
 ## Before you start
 

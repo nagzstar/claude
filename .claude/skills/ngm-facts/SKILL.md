@@ -181,10 +181,9 @@ Confirmed against the repository and the live GitHub/Cloudflare state:
 
 ## Known discrepancies — do not silently "correct" these
 
-1. **The GitHub repository is `nagzstar/ngm.app`** — renamed from `ngm.terraform`. The local
-   `origin` was corrected to point at it directly on 2026-09-06, so the rename redirect is no
-   longer relied on. The local directory is still `~/git/ngm.terraform`; that is just a folder
-   name and is expected.
+1. **Resolved.** The GitHub repository is `nagzstar/ngm.app`, renamed from `ngm.terraform`.
+   `origin` points at it directly, and the local working directory has been renamed to match:
+   `C:/Users/nagaj/git/ngm.app`. Repo name, remote and folder name now all agree.
 2. **`main` has no branch protection, and it cannot have any — this is accepted.** The repo is private on a
    free plan, so the protection API returns 403 ("Upgrade to GitHub Pro or make this
    repository public"). Environment *protection rules* — required reviewers on `prod` — are

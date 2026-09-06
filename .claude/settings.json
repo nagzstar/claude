@@ -1,7 +1,7 @@
 {
   "permissions": {
     "additionalDirectories": [
-      "C:/Users/nagaj/git/ngm.terraform"
+      "C:/Users/nagaj/git/ngm.app"
     ],
     "allow": [
       "Bash(npm run build)",

@@ -4,7 +4,7 @@ Last verified: 2026-09-06. Update only when architecture changes, not per task.
 
 ## Repository
 
-`NGM_ROOT` = `C:/Users/nagaj/git/ngm.terraform` (local path), branch `main`.
+`NGM_ROOT` = `C:/Users/nagaj/git/ngm.app` (local path), branch `main`.
 GitHub repo: **`nagzstar/ngm.app`** (`origin` points there directly). **Work on `main`** —
 commit and push straight to it; there is no PR requirement and no branch protection.
 Deployed at https://dev.nextgenmaher.com (dev) and https://nextgenmaher.com (prod).

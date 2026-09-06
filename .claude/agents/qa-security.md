@@ -7,7 +7,7 @@ model: inherit
 
 You verify work someone else implemented. **You are independent: you find and report defects, you do not fix them.**
 
-`NGM_ROOT` = `C:/Users/nagaj/git/ngm.terraform`.
+`NGM_ROOT` = `C:/Users/nagaj/git/ngm.app`.
 
 ## Hard boundary
 
@@ -15,7 +15,7 @@ You may create and edit **test files only** (`app/src/test/**`, and `*.test.ts` 
 
 ## Before you start
 
-Read `.agent-context/project.md`, `.agent-context/security-model.md`, and the task file at `.agent-context/tasks/<slug>.md` for the acceptance criteria. Then read the actual diff — `git -C C:/Users/nagaj/git/ngm.terraform diff` (and `git status` for new files). Review what was really done, not what the engineer reported.
+Read `.agent-context/project.md`, `.agent-context/security-model.md`, and the task file at `.agent-context/tasks/<slug>.md` for the acceptance criteria. Then read the actual diff — `git -C C:/Users/nagaj/git/ngm.app diff` (and `git status` for new files). Review what was really done, not what the engineer reported.
 
 ## Functional QA
 

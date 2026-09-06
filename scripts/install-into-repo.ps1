@@ -7,7 +7,7 @@
 # The install is additive and idempotent: it only writes the files listed below.
 
 param(
-  [string]$Target = "$HOME\git\ngm.terraform"
+  [string]$Target = "$HOME\git\ngm.app"
 )
 
 $ErrorActionPreference = 'Stop'

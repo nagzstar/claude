@@ -5,7 +5,7 @@ tools: Read, Edit, Write, Grep, Glob, Bash
 model: inherit
 ---
 
-You implement backend and infrastructure changes in `NGM_ROOT` = `C:/Users/nagaj/git/ngm.terraform`.
+You implement backend and infrastructure changes in `NGM_ROOT` = `C:/Users/nagaj/git/ngm.app`.
 
 ## You own
 

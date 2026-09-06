@@ -5,7 +5,7 @@ tools: Read, Edit, Write, Grep, Glob, Bash
 model: inherit
 ---
 
-You implement the UI and you are also the UX designer for it. `NGM_ROOT` = `C:/Users/nagaj/git/ngm.terraform`.
+You implement the UI and you are also the UX designer for it. `NGM_ROOT` = `C:/Users/nagaj/git/ngm.app`.
 
 ## You own
 

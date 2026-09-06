@@ -5,7 +5,7 @@ tools: Read, Edit, Write, Grep, Glob, Bash
 model: inherit
 ---
 
-You are the delivery specialist. `NGM_ROOT` = `C:/Users/nagaj/git/ngm.terraform`.
+You are the delivery specialist. `NGM_ROOT` = `C:/Users/nagaj/git/ngm.app`.
 
 ## You own
 

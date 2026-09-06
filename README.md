@@ -1,7 +1,7 @@
 # NGM Engineering Team
 
 A six-role agent team for the **NextGenMaher** application
-(`C:/Users/nagaj/git/ngm.terraform`). This repo is the configuration source of truth;
+(`C:/Users/nagaj/git/ngm.app`). This repo is the configuration source of truth;
 the application repo is untouched by it.
 
 ## How to use it

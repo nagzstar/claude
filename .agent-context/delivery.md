@@ -60,7 +60,7 @@ that way.
 
 | Fact | Value |
 |---|---|
-| GitHub repo | `nagzstar/ngm.app` — `origin` points here directly (renamed from `ngm.terraform`; remote corrected 2026-09-06) |
+| GitHub repo | `nagzstar/ngm.app` — `origin`, repo name and local folder `~/git/ngm.app` all agree |
 | DEV site | https://dev.nextgenmaher.com — HTTP 200 |
 | PROD site | https://nextgenmaher.com — HTTP 200 |
 | Pages projects | `ngm-dev`, `ngm-prod` (direct-upload; wrangler pushes `dist` from CI) |
