@@ -35,10 +35,21 @@ there — the design records what is missing.
 
 ---
 
-## Phase 1 — foundation (no accounts needed)
+## Phase 0 — decide the approach (you are in the room for this one)
 
-> This is the phase Claude can complete alone, and may already be done. Check the task file
-> before pasting it.
+The mobile approach is a tier-4 architecture decision and yours to ratify. Switch the session
+to Fable first (`/model claude-fable-5-1`).
+
+```
+Read .agent-context/tasks/mobile-app.md. If .agent-context/tasks/mobile-app-design.md exists,
+review it; if not, have researcher-architect produce it. Then present me the decision to make:
+the recommended approach against the alternatives, the App Store guideline 4.2 risk and how
+we avoid it, how a store binary selects its backend, every cost with a figure, and the phased
+plan with what is blocked on me. Do not write any code until I ratify. Record my decision in
+the task file.
+```
+
+## Phase 1 — foundation (no accounts needed)
 
 ```
 Read .agent-context/tasks/mobile-app.md and .agent-context/tasks/mobile-app-design.md, then
