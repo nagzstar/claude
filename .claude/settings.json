@@ -1,0 +1,48 @@
+{
+  "permissions": {
+    "additionalDirectories": [
+      "C:/Users/nagaj/git/ngm.terraform"
+    ],
+    "allow": [
+      "Bash(npm run build)",
+      "Bash(npm run lint)",
+      "Bash(npm run test)",
+      "Bash(npm ci)",
+      "Bash(npm install)",
+      "Bash(git status)",
+      "Bash(git diff:*)",
+      "Bash(git log:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git checkout:*)",
+      "Bash(git switch:*)",
+      "Bash(git branch:*)",
+      "Bash(git push)",
+      "Bash(git push origin:*)",
+      "Bash(gh run list:*)",
+      "Bash(gh run view:*)",
+      "Bash(gh run watch:*)",
+      "Bash(gh run rerun:*)",
+      "Bash(gh workflow list:*)",
+      "Bash(gh workflow view:*)",
+      "Bash(gh pr list:*)",
+      "Bash(gh pr view:*)",
+      "Bash(gh pr create:*)",
+      "Bash(gh api repos/:*)",
+      "Bash(terraform fmt:*)",
+      "Bash(terraform validate:*)"
+    ],
+    "deny": [
+      "Read(**/.env)",
+      "Read(**/.env.*)",
+      "Bash(terraform apply:*)",
+      "Bash(terraform destroy:*)",
+      "Bash(supabase db reset:*)",
+      "Bash(supabase db push:*)",
+      "Bash(wrangler deploy:*)",
+      "Bash(wrangler pages deploy:*)",
+      "Bash(git push --force:*)",
+      "Bash(git push -f:*)"
+    ]
+  }
+}
