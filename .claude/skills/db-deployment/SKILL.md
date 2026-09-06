@@ -71,7 +71,8 @@ still runs it.
    `supabase/functions/**` triggers `database-migration.yml` against **dev automatically**.
    That job links the project, pushes the migrations, then deploys the edge functions,
    sequentially in one job — so migrations and functions are ordered *relative to each other*.
-   **PROD is dispatch-only and is the user's decision.**
+   **PROD is dispatch-only and is the user's decision**: the Orchestrator asks "Shall I
+   deploy this to prod?" and dispatches only on an explicit yes.
 
 ## Verification
 

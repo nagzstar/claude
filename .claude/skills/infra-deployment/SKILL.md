@@ -67,7 +67,8 @@ this skill. Everything below is a snapshot, not an authority.
 7. **Hand back to the Orchestrator**, who pushes to `main`. A change under `terraform/**`
    triggers `terraform-plan.yml`, which runs a matrix over `[dev, prod]`. **Read both legs of
    that plan before anything is applied.** Applying dev is the Orchestrator's; **applying prod
-   is the user's decision** and the `guard-prod` hook blocks the dispatch.
+   is the user's decision** — the Orchestrator asks "Shall I deploy this to prod?" and
+   dispatches only on an explicit yes; the `guard-prod` hook blocks any other prod dispatch.
 
 ## Verification
 
@@ -119,7 +120,7 @@ From `user-signup-approval` (2026-09-06). Confirmed unless marked inferred.
   pushed and planned with **zero** risk to prod, and reviewed before anyone dispatched it.
 - The order that actually worked: read the existing root → adapt the design → gate per
   environment → `fmt` → push → read both plan legs → apply dev → verify outside Terraform →
-  prepare prod → hand the dispatch to the user.
+  prepare prod → ask the user "Shall I deploy this to prod?" → dispatch prod on their yes.
 
 ## Known problems
 

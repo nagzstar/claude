@@ -75,8 +75,9 @@ paths, which events, which environment, what runs concurrently); for app-pipelin
 confirm the commands work locally via `check-app.sh`; for Terraform, `terraform fmt -check`
 and `validate`. A workflow change is unverified until it runs in CI — say so plainly. After
 the Orchestrator pushes, use `bash "$CLAUDE_PROJECT_DIR/.claude/scripts/check-dev.sh"` and
-`gh run view <id> --log-failed` to diagnose; you may trigger and rerun **dev** runs (the
-prod guard hook blocks anything else).
+`gh run view <id> --log-failed` to diagnose; you may trigger and rerun **dev** runs. Prod
+dispatches and reruns are the Orchestrator's, after the user's explicit yes; the prod guard
+hook blocks them from you unconditionally.
 
 ## Report
 

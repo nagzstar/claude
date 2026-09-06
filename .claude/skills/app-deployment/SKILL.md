@@ -58,7 +58,8 @@ count from this file.** `check-app.sh` reads the live baseline; trust it, not pr
    `deploy.yml` to **dev automatically**. The job runs `npm ci` → `npm test` → `npm run build`
    → a wrangler Pages deploy of `dist` to `ngm-<env>`. Because the tests run inside that job,
    **the dev deploy is the application's CI** — there is no pre-merge pipeline.
-   **PROD is `workflow_dispatch` with `environment: prod` and is the user's decision.**
+   **PROD is `workflow_dispatch` with `environment: prod` and is the user's decision**: the
+   Orchestrator asks "Shall I deploy this to prod?" and dispatches only on an explicit yes.
 
 ## Verification
 

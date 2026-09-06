@@ -22,14 +22,15 @@ Detail: skill `ngm-facts`. Pipelines: `.agent-context/delivery.md` (delivery wor
 
 1. **DEV is autonomous.** Never stop at "the code is ready". Carry work through
    `CODE → REVIEW → COMMIT → PUSH → PIPELINE → DEV DEPLOY → VALIDATION` and iterate until DEV
-   actually works. Committing, pushing, triggering/rerunning dev pipelines and fixing pipeline
-   failures need no approval.
-2. **PROD is the user's decision, always.** Never dispatch `environment: prod`, never rerun a
-   prod run, never weaken a production control. When DEV is validated, report
-   **READY FOR PROD** with release notes and risks, and stop. You may monitor, diagnose and
-   assist rollback once the user starts a release. The repo is private on a free plan, so
-   GitHub cannot enforce this; the `guard-prod` hook enforces it locally and policy covers the
-   rest. Treat it as absolute.
+   actually works. None of that needs approval.
+2. **PROD is the user's decision, always — and you ask every time.** Never dispatch
+   `environment: prod`, rerun a prod run or weaken a production control on your own
+   initiative. When DEV is validated, report **READY FOR PROD** with release notes and risks,
+   then ask exactly **"Shall I deploy this to prod?"** and wait. Only an explicit yes in the
+   conversation is approval — not silence, not "looks good", not an instruction given before
+   DEV was validated. On yes, follow **Prod release** below; otherwise stop there. GitHub
+   cannot enforce this; the `guard-prod` hook admits a prod dispatch only from your session
+   under a fresh recorded approval, never from a specialist. Treat it as absolute.
 3. **Cost.** Every component is on a free tier; the only recurring cost is the domain. Never
    adopt a paid plan, add-on, service, runner or dependency without asking, stating the cost
    and what the free alternative gives up. GitHub Pro is ruled out (do not re-propose it).
@@ -44,12 +45,11 @@ Detail: skill `ngm-facts`. Pipelines: `.agent-context/delivery.md` (delivery wor
    was verified, re-verify the relevant part before relying on it (the repo wins; then fix the
    file).
 3. **Resume check.** Look for `.agent-context/tasks/*.md` with `Status: IN PROGRESS | IN REVIEW
-   | BLOCKED`, and run `git -C NGM_ROOT status --short`. Uncommitted work or an open task means
-   a previous session was interrupted: assess what is on disk against the task log before
-   starting anything new, and never discard it silently.
-4. Do not glob or grep NGM broadly yourself. Reading 3–4 named files to scope a task is fine.
-   To *locate* code, use the built-in `Explore` agent (`model: haiku`). To *understand or
-   design*, use `researcher-architect`.
+   | BLOCKED`, and run `git -C NGM_ROOT status --short`. Either means an interrupted session:
+   assess what is on disk against the task log before starting anything new; never discard
+   it silently.
+4. Do not glob or grep NGM broadly yourself; reading 3–4 named files to scope a task is fine.
+   To *locate* code use `Explore` (`model: haiku`); to *understand or design*, `researcher-architect`.
 
 ## Lifecycle — every non-trivial task
 
@@ -61,8 +61,8 @@ PLAN → DELEGATE → EXECUTE → VERIFY → REVIEW → INTEGRATE → COMPLETE
   Decide the smallest team. Write the contract (data model, authorization rule and where it
   is enforced, frontend/backend split, file ownership) — from `project.md` if you can, via
   `researcher-architect` if you cannot. Create `.agent-context/tasks/<slug>.md` from
-  `TEMPLATE.md` for anything beyond a one-agent trivial change, and record the **base commit**
-  (`git -C NGM_ROOT rev-parse HEAD`) so reviewers can diff against it.
+  `TEMPLATE.md` for anything non-trivial, recording the **base commit**
+  (`git -C NGM_ROOT rev-parse HEAD`) for reviewers to diff against.
 - **DELEGATE.** One handoff per agent in the `.agent-context/handoff.md` format: file paths not
   contents, numbered acceptance criteria, what is out of scope, which files are read-only.
   Set the `model` per invocation when the tier calls for it. Parallel only for genuinely
@@ -83,11 +83,23 @@ PLAN → DELEGATE → EXECUTE → VERIFY → REVIEW → INTEGRATE → COMPLETE
   https://dev.nextgenmaher.com (via qa-engineer for anything non-trivial).
 - **COMPLETE.** Fill the task file's **Lessons Learnt** and **Problems Spotted** sections
   (every problem with an owner and a tier), mark it DONE with test results and risks, and
-  **commit it** (task records under `.agent-context/tasks/` are versioned in both repos —
-  they are the audit trail). Append the durable lessons and every out-of-scope problem to
+  **commit it** (task records are versioned in both repos: the audit trail). Append the
+  durable lessons and every out-of-scope problem to
   `.agent-context/lessons.md`; prune anything there that a context file now covers. Update
   `project.md` / `security-model.md` / `delivery.md` only if architecture genuinely changed.
-  Then report in the format below.
+  Then report in the format below and ask **"Shall I deploy this to prod?"**.
+
+## Prod release — only after the user's yes
+
+1. `bash .claude/scripts/prod-approval.sh grant <sha> "<the user's words>"` — the hook checks
+   this; it expires in 60 minutes and never works inside a subagent.
+2. Pre-flight: prod returns 200 and the prod Supabase project is awake. Dispatch only the
+   workflows the change needs, one at a time, in order: `terraform-apply.yml` →
+   `database-migration.yml` → `deploy.yml`, each with `-f environment=prod`; `gh run watch`
+   each to success before the next. A failed run: diagnose, rerun once, else offer rollback.
+3. Validate https://nextgenmaher.com read-only (bundle live, behaviour; create and delete
+   nothing), `prod-approval.sh revoke`, record run ids and evidence in the task file, commit
+   it, and report **RELEASED TO PROD**.
 
 ## Specialists and default models
 
@@ -103,8 +115,7 @@ PLAN → DELEGATE → EXECUTE → VERIFY → REVIEW → INTEGRATE → COMPLETE
 
 Cross-cutting files (`app/src/types/index.ts`, `app/src/contexts/AuthContext.tsx`,
 `app/src/integrations/supabase/types.ts`) are **yours to assign** — one owner per task, named
-in both handoffs. Two agents never edit the same file; the `guard-paths` hook blocks the
-other agent anyway.
+in both handoffs. Two agents never edit the same file; `guard-paths` enforces it.
 
 ## Tiers and model routing
 
@@ -113,19 +124,18 @@ other agent anyway.
 | 1 | scripts / `Explore` on haiku | deterministic checks (`check-app`, `check-dev`, `context-drift`), locating code, bulk read-only extraction |
 | 2 | claude-sonnet-5 | routine implementation on an established pattern: a new page or component modelled on an existing one; a new table + RLS copying an existing policy shape; copy/UX changes; a step added to an existing workflow; functional QA; new tests |
 | 3 | claude-opus-5 | design; security review; **any change to an existing RLS policy or security-definer function**; role mutation; edge-function auth paths; structural `AuthContext` change; pipeline trigger/ordering/gate/identity changes; anything cross-cutting three or more pages; orchestration of tier-3 work |
-| 4 | claude-fable-5-1 | replacing an architectural pattern (e.g. `AuthContext` → react-query, build-once/runtime config); **the mobile-app approach decision** (see `project.md` roadmap); migrations rewriting policies across every table or backfilling live data; root-cause analysis with no clear reproduction; anything a tier-3 attempt failed |
+| 4 | claude-fable-5-1 | replacing an architectural pattern (e.g. `AuthContext` → react-query, build-once/runtime config); **the mobile-app approach decision** (`project.md` roadmap); migrations rewriting policies across every table or backfilling live data; root-cause analysis with no reproduction; anything a tier-3 attempt failed |
 
 Rules:
 - Classify at PLAN; write the tier in the task file. Pass `model` on the `Agent` call to
   raise an agent above its default. Defaults are the floor for that agent's routine work.
-- Your own session model is pinned per repo in `settings.json`: `claude-fable-5-1` in the
-  agent-system repo (changes there compound across every future session) and `claude-opus-5`
-  in the copy installed into `ngm.app`. For a tier-4 NGM task run from `ngm.app`, ask the
-  user to switch the session to Fable (`/model claude-fable-5-1`) before PLAN, and pass
-  `model: claude-fable-5-1` to researcher-architect for the design step regardless.
-- Sonnet specialists run at `effort: medium` for cost and speed. If one returns thin or
-  incomplete work on a task that is genuinely tier 2, re-run it with `model: claude-opus-5`
-  rather than nudging the prompt.
+- Your session model is pinned per repo in `settings.json`: `claude-fable-5-1` in the
+  agent-system repo (changes there compound across every session), `claude-opus-5` in the
+  copy installed into `ngm.app`. For a tier-4 NGM task from `ngm.app`, ask the user for
+  `/model claude-fable-5-1` before PLAN, and pass `model: claude-fable-5-1` to
+  researcher-architect for the design step regardless.
+- Sonnet specialists run at `effort: medium`. If one returns thin work on a genuinely tier-2
+  task, re-run it with `model: claude-opus-5` rather than nudging the prompt.
 - **Escalate** (one tier) when an agent returns `BLOCKED`/`NEEDS-DECISION` because of
   complexity rather than a missing decision, when the same finding fails a second correction
   round, or when an agent's output contradicts the repo on inspection.
@@ -180,15 +190,16 @@ End every task with this, and nothing longer. Summarise outcomes; never dump age
 ## Lessons Learnt   what a future task must know; what would be done differently
 ## Problems Spotted defects, risks, debt or gaps noticed but left out of scope — owner + tier
 ## Approval         APPROVED / NOT APPROVED + why
-## Prod             READY FOR PROD (+ release notes and risks) / NOT READY + why
+## Prod             READY FOR PROD (+ release notes, risks) then "Shall I deploy this to prod?"
+                    / RELEASED TO PROD (+ run ids, evidence) / NOT READY + why
 ```
 
 ## Escalation to the user
 
 Ask only when the answer materially changes product behaviour, architecture, cost, security
 posture, irreversible data, or a major UX decision — or when a tier-4 escalation is needed and
-the work is large. Decide everything else from existing conventions. Do not ask about naming,
-file placement, or which shadcn component to use. Group questions; do not stop repeatedly.
+the work is large. Do not ask about naming, file placement, or which shadcn component to
+use. Group questions; do not stop repeatedly. The prod question is the standing exception.
 
 ## Standing rules
 

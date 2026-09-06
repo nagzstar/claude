@@ -56,7 +56,7 @@ for s in .claude/skills/*/SKILL.md; do
   d="$(basename "$(dirname "$s")")"; n="$(grep -E '^name:' "$s" | head -1 | sed 's/^name:[[:space:]]*//')"
   [ "$n" = "$d" ] && ok || bad "$s: skill name '$n' != dir '$d'"
 done
-[ "$(wc -c <CLAUDE.md)" -lt 14000 ] && ok || bad "CLAUDE.md over 14 kB — it is always in context"
+[ "$(wc -c <CLAUDE.md)" -lt 15000 ] && ok || bad "CLAUDE.md over 15 kB — it is always in context"
 
 # ---- 3. settings + hooks ------------------------------------------------------------------
 node -e 'JSON.parse(require("fs").readFileSync(".claude/settings.json","utf8"))' 2>/dev/null && ok || bad "settings.json is not valid JSON"
@@ -71,16 +71,36 @@ for s in .claude/hooks/*.sh .claude/scripts/*.sh scripts/*.sh evals/*.sh; do
 done
 
 # ---- 4. hook behaviour --------------------------------------------------------------------
-prod() { # expect cmd
-  local exp="$1" cmd="$2" rc
-  printf '{"tool_name":"Bash","tool_input":{"command":%s}}' "$(node -e 'console.log(JSON.stringify(process.argv[1]))' "$cmd")" \
+# The prod approval token is redirected to a scratch file so the tests never touch a real one.
+export PROD_APPROVAL_FILE="$(mktemp -t ngm-prod-approval.XXXXXX)"; rm -f "$PROD_APPROVAL_FILE"
+prod() { # expect cmd [agent]
+  local exp="$1" cmd="$2" agent="${3:-}" rc extra=""
+  [ -n "$agent" ] && extra=",\"agent_id\":\"$agent\",\"agent_type\":\"$agent\""
+  printf '{"tool_name":"Bash","tool_input":{"command":%s}%s}' "$(node -e 'console.log(JSON.stringify(process.argv[1]))' "$cmd")" "$extra" \
     | bash .claude/hooks/guard-prod.sh >/dev/null 2>&1; rc=$?
-  if { [ "$exp" = block ] && [ $rc -eq 2 ]; } || { [ "$exp" = allow ] && [ $rc -eq 0 ]; }; then ok; else bad "guard-prod: expected $exp for: $cmd (rc=$rc)"; fi
+  if { [ "$exp" = block ] && [ $rc -eq 2 ]; } || { [ "$exp" = allow ] && [ $rc -eq 0 ]; }; then ok; else bad "guard-prod: expected $exp for: $cmd${agent:+ (agent $agent)} (rc=$rc)"; fi
 }
+# No approval recorded: every prod dispatch is blocked.
 prod block 'gh workflow run deploy.yml -f environment=prod'
 prod block 'gh workflow run terraform-apply.yml --field environment=prod'
 prod block 'gh api repos/nagzstar/ngm.app/actions/workflows/deploy.yml/dispatches -f inputs[environment]=prod'
 prod block 'curl -X POST https://api.github.com/repos/x/y/actions/workflows/deploy.yml/dispatches -d "{\"inputs\":{\"environment\":\"prod\"}}"'
+# Approval recorded by the script: the main session may dispatch prod; a subagent never may.
+bash .claude/scripts/prod-approval.sh grant 0123abc "yes, deploy it" >/dev/null 2>&1 && ok || bad "prod-approval.sh grant failed"
+bash .claude/scripts/prod-approval.sh status >/dev/null 2>&1 && ok || bad "prod-approval.sh status should succeed while active"
+prod allow 'gh workflow run deploy.yml -f environment=prod'
+prod block 'gh workflow run deploy.yml -f environment=prod' deployment-engineer
+prod block 'terraform apply -auto-approve'   # an approval never unlocks direct deploys
+grep -q '^admitted_epoch=' "$PROD_APPROVAL_FILE" && ok || bad "guard-prod did not log the admitted prod command"
+bash .claude/scripts/prod-approval.sh revoke >/dev/null 2>&1 && ok || bad "prod-approval.sh revoke failed"
+[ ! -f "$PROD_APPROVAL_FILE" ] && ok || bad "revoke left the approval file behind"
+prod block 'gh workflow run deploy.yml -f environment=prod'
+# An expired approval is blocked and cleared.
+printf 'granted_epoch=1\nsha=0123abc\n' > "$PROD_APPROVAL_FILE"
+prod block 'gh workflow run deploy.yml -f environment=prod'
+[ ! -f "$PROD_APPROVAL_FILE" ] && ok || bad "guard-prod did not clear an expired approval"
+bash .claude/scripts/prod-approval.sh grant notasha "yes" >/dev/null 2>&1 && bad "grant accepted a non-sha" || ok
+bash .claude/scripts/prod-approval.sh grant 0123abc >/dev/null 2>&1 && bad "grant accepted a missing quote" || ok
 prod allow 'gh workflow run deploy.yml -f environment=dev'
 prod allow 'gh workflow run terraform-apply.yml -f environment=dev'
 prod block 'terraform apply -auto-approve'

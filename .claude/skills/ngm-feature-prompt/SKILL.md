@@ -57,7 +57,9 @@ Each fenced block is read by an Orchestrator with no memory of this session. It 
   pattern, RLS policies, pipeline separation, and existing path filters;
 - carry the work to DEV explicitly ("check-app must pass, commit, push, watch the pipeline,
   validate on dev.nextgenmaher.com") because the non-negotiable is that DEV is autonomous;
-- end with "Do not deploy to production" whenever the phase touches anything deployable.
+- end with "ask me before any production deployment" whenever the phase touches anything
+  deployable — the Orchestrator asks "Shall I deploy this to prod?" by default, and the
+  phrase keeps that visible to the user reading the prompt.
 
 Do not put tier or agent names in the block. The Orchestrator classifies the tier itself; a
 prompt that hardcodes the team will be wrong as soon as the design changes.
@@ -75,7 +77,7 @@ user rather than assuming it.
 - [ ] Nothing in the document restates the design, architecture or file contents.
 - [ ] Every user-blocked item has a real cost figure and names what it blocks.
 - [ ] Unblocked phases come before blocked ones.
-- [ ] Every deployable phase ends at DEV, never at prod.
+- [ ] Every deployable phase ends at DEV and asks before prod; none deploys prod unasked.
 - [ ] Each phase block is pasteable standing alone, with no reference to "this conversation".
 - [ ] The task file `.agent-context/tasks/<slug>.md` exists and the prompt points at it.
 - [ ] Under about 150 lines. If it is longer, detail has leaked in from the design.

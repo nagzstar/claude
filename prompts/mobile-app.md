@@ -62,7 +62,7 @@ do not add react-query, do not touch RLS.
 
 Carry it to DEV: check-app must pass with no new lint problems, commit and push to main,
 watch the pipeline, and validate the web app still works. Report READY FOR PROD or what is
-blocking. Do not deploy to production.
+blocking, and ask me before any production deployment.
 ```
 
 ## Phase 2 — auth and deep links on device
@@ -74,7 +74,7 @@ deep links so password reset and email confirmation return into the app instead 
 
 This changes terraform/env/*.tfvars uri_allow_list, so backend-engineer owns it and
 security-reviewer must sign off that no existing redirect control is weakened. Apply to DEV
-only; prepare the prod values but do not dispatch prod.
+only; prepare the prod values and ask me before dispatching prod.
 ```
 
 ## Phase 3 — Android build in CI
@@ -116,8 +116,9 @@ Prepare a release build and tell me what I need to click to ship it to internal 
 
 ## Guardrails that stay in force
 
-- **PROD is yours.** The team stops at READY FOR PROD with release notes and risks, and a
-  store submission is a production act — it will be prepared, never submitted, for you.
+- **PROD is yours.** The team reports READY FOR PROD with release notes and risks and asks
+  "Shall I deploy this to prod?" before any production deployment. A store submission is a
+  production act with no pipeline behind it — it will be prepared, never submitted, for you.
 - **Free or as close to free as possible.** The only new costs are the two store fees above.
   No paid CI, no paid build service, no paid distribution tooling. macOS runners bill Actions
   minutes at a 10× multiplier, so iOS builds are not free and the design says how they are

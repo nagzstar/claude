@@ -20,8 +20,9 @@ Make the participant message list usable on a phone.
 The session you are talking to is the Orchestrator (`CLAUDE.md`). It classifies the work
 into a tier, picks the smallest team and the right model for each piece, writes the contract,
 delegates with scoped handoffs, reviews, integrates (commits and pushes to `main`), watches
-the dev pipeline, validates on https://dev.nextgenmaher.com and reports **READY FOR PROD** —
-or asks you when the decision is genuinely yours. You should not need to name agents or
+the dev pipeline, validates on https://dev.nextgenmaher.com, reports **READY FOR PROD** and
+asks **"Shall I deploy this to prod?"** — releasing to production only on your explicit yes,
+and otherwise asking you only when a decision is genuinely yours. You should not need to name agents or
 manage context. To constrain it, say so ("frontend only", "investigate, don't implement").
 
 ## Architecture
@@ -65,16 +66,20 @@ made with you before any code, so no mobile agent exists yet.
 
 ## Safety rails that are enforced, not just written
 
-- **`.claude/hooks/guard-prod.sh`** blocks, for every agent and model: any workflow dispatch
-  or API dispatch naming prod, rerunning a run with a prod job, direct `terraform apply` /
-  `wrangler` / `supabase db push`, and force pushes.
+- **`.claude/hooks/guard-prod.sh`** blocks, for every agent and model: direct `terraform
+  apply` / `wrangler` / `supabase db push` and force pushes, always; and any workflow dispatch
+  or API dispatch naming prod, or rerun of a run with a prod job, unless the Orchestrator's
+  own session holds a fresh approval recorded by `.claude/scripts/prod-approval.sh` — which
+  it records only after you answer "Shall I deploy this to prod?" with a yes. A specialist
+  can never release, approval or not.
 - **`.claude/hooks/guard-paths.sh`** blocks each specialist from editing files outside its
   ownership (so QA cannot fix what it reviews and two engineers cannot touch the same file).
 - **`.claude/settings.json`** keeps the deny list as a second layer and allows the routine
   dev commands so they do not prompt.
 
 GitHub cannot enforce the prod gate on a private free-plan repo, so the hook plus policy is
-the control. **PROD is yours**: the team stops at READY FOR PROD with release notes and risks.
+the control. **PROD is yours**: the team reports READY FOR PROD with release notes and risks,
+asks "Shall I deploy this to prod?", and releases only when you say yes.
 
 ## Cost
 
@@ -91,7 +96,7 @@ CLAUDE.md                          Orchestrator contract (always in context)
 .claude/skills/ngm-facts           Environment, cost and deployment-authority facts
 .claude/skills/ngm-feature-prompt  How to write a pasteable multi-phase feature prompt (prompts/)
 .claude/hooks/                     guard-prod.sh, guard-paths.sh
-.claude/scripts/                   check-app.sh, check-dev.sh, context-drift.sh
+.claude/scripts/                   check-app.sh, check-dev.sh, context-drift.sh, prod-approval.sh
 .claude/settings.json              Permissions + the prod guard hook
 .agent-context/project.md          Architecture summary — read instead of re-exploring
 .agent-context/security-model.md   Roles, RLS, the dual-role-system hazard

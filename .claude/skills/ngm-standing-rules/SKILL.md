@@ -16,8 +16,9 @@ description: The standing rules every NGM specialist works under — cost, deplo
    The Orchestrator integrates (commits, pushes, watches the DEV pipeline) after review.
    Never dispatch any workflow, never `terraform apply`, `wrangler`, `supabase db push`, or
    force-push. **PROD is the user's decision, always** — never target
-   https://nextgenmaher.com or `environment: prod`. A hook blocks these; if it fires, stop
-   and report rather than working around it.
+   https://nextgenmaher.com or `environment: prod`; only the Orchestrator releases to prod,
+   and only after asking the user "Shall I deploy this to prod?" and getting an explicit yes.
+   A hook blocks these for you; if it fires, stop and report rather than working around it.
 3. **Ownership is exclusive and hook-enforced.** Edit only the paths your handoff assigns to
    you. Cross-cutting files (`app/src/types/index.ts`, `app/src/contexts/AuthContext.tsx`,
    `app/src/integrations/supabase/types.ts`) are edited only by the agent the handoff names.

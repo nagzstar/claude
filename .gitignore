@@ -1,0 +1,3 @@
+# Transient prod-release approval token written by .claude/scripts/prod-approval.sh and
+# read by .claude/hooks/guard-prod.sh. Never commit it; the audit trail is the task record.
+.agent-context/.prod-approval

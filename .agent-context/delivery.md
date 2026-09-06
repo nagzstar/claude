@@ -33,7 +33,8 @@ Runs `init` → `apply -auto-approve` → `output`. The deliberate design note i
 GitHub Environment protection rules are not free on private repos and HCP auto-apply is off,
 so **a human dispatching the workflow is the approval gate**. Respect that reasoning; if you
 want a stronger gate, propose it, do not silently rewire it. Claude may dispatch it for
-**dev** only; the `guard-prod` hook blocks a prod dispatch.
+**dev** freely, and for **prod** only after asking the user "Shall I deploy this to prod?"
+and recording their explicit yes; the `guard-prod` hook blocks any other prod dispatch.
 
 **State/config**: HCP Terraform. `TF_WORKSPACE=ngm-<env>` selects the workspace; each
 workspace supplies its own secrets and its own `-var-file` via `TF_CLI_ARGS_plan`/`_apply`,
@@ -75,11 +76,17 @@ Cloudflare wiring lives in `terraform/modules/cloudflare`: a Pages project, a
 `pages.dev` subdomain (proxying is what allows a CNAME at the zone apex, via CNAME
 flattening). All four workflows have real successful runs in history.
 
-**Deployment authority: DEV is Claude's, PROD is the user's.** Nothing in GitHub prevents a
-`workflow_dispatch` with `environment: prod` on this plan. The production gate is therefore
-**policy plus the local `guard-prod` hook**, and must be treated as absolute precisely because
-GitHub does not enforce it. GitHub Pro would enable branch protection and required reviewers
-but is a **paid plan and therefore ruled out**.
+**Deployment authority: DEV is Claude's, PROD is the user's — asked for every time.** When
+DEV is validated the Orchestrator reports READY FOR PROD and asks "Shall I deploy this to
+prod?"; on an explicit yes it records the approval with `.claude/scripts/prod-approval.sh`,
+dispatches the prod workflows the change needs in order (`terraform-apply.yml` →
+`database-migration.yml` → `deploy.yml`), watches each, validates https://nextgenmaher.com
+read-only, revokes the approval and records the release in the task file. Nothing in GitHub
+prevents a `workflow_dispatch` with `environment: prod` on this plan. The production gate is
+therefore **policy plus the local `guard-prod` hook** (which admits a prod dispatch only from
+the main session under a fresh recorded approval), and must be treated as absolute precisely
+because GitHub does not enforce it. GitHub Pro would enable branch protection and required
+reviewers but is a **paid plan and therefore ruled out**.
 
 **Tooling:** `bash .claude/scripts/check-dev.sh [--sha <sha>]` reports the runs for a commit
 and the dev HTTP status; `gh run view <id> --log-failed` for diagnosis.

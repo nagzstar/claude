@@ -18,7 +18,7 @@ with a fact here, **flag the discrepancy** rather than silently revising this do
 | Database | Supabase (dev `qcpeqygsfhhzegsvzikp`, prod `cuwnzdysvaroglqqxhhh`) |
 | Infrastructure | Terraform on HCP Terraform, workspaces `ngm-dev` / `ngm-prod`, auto-apply off |
 | Pipelines | Infrastructure (`terraform/**`) and application (`app/**`, `supabase/**`) — separate, by path filter |
-| DEV / PROD authority | Claude / **User** |
+| DEV / PROD authority | Claude / **User** — Claude asks "Shall I deploy this to prod?" and releases only on an explicit yes |
 | Cost posture | Free or as close to free as possible — hard requirement |
 
 ## Cost — the free-tier design (verified 2026-09-06)
@@ -55,19 +55,30 @@ read logs; fix failures; redeploy; run QA and defensive security testing. Do not
 CODE → REVIEW → COMMIT → PUSH → PIPELINE → DEV DEPLOYMENT → VALIDATION
 ```
 
-**PROD — the user decides.** Claude never triggers a production deployment, never dispatches
-`environment: prod`, never reruns a prod run, never bypasses or weakens a production control.
-Claude may prepare production-ready code, inspect prod pipelines and configuration, assess
-readiness, explain what would ship, identify risks, and — once the user starts a release —
-monitor it, diagnose failures and assist with rollback.
+**PROD — the user decides, every time; the Orchestrator carries it out.** Claude never
+dispatches `environment: prod`, reruns a prod run, or weakens a production control on its own
+initiative. When DEV is validated the Orchestrator reports **READY FOR PROD** with release
+notes and risks and asks exactly **"Shall I deploy this to prod?"**, then waits. Only an
+explicit yes in the conversation is approval — not silence, not "looks good", not an
+instruction given before DEV was validated. On yes, the Orchestrator records the approval
+(`bash .claude/scripts/prod-approval.sh grant <sha> "<the user's words>"`), dispatches the
+prod workflows the change needs in order (`terraform-apply.yml` → `database-migration.yml` →
+`deploy.yml`), watches each run, validates https://nextgenmaher.com read-only, revokes the
+approval, records the release in the task file and reports **RELEASED TO PROD**. Specialists
+never release; if the user says no or does not answer, the work stops at READY FOR PROD.
 
 ```
-DEV VALIDATED → READY FOR PROD (release notes + risks) → USER DEPLOYS → CLAUDE MAY MONITOR
+DEV VALIDATED → READY FOR PROD (release notes + risks) → "Shall I deploy this to prod?"
+  → yes → prod-approval grant → dispatch prod → watch → validate prod → revoke → RELEASED TO PROD
+  → no / silence → stop
 ```
 
-Enforcement: the `.claude/hooks/guard-prod.sh` PreToolUse hook blocks prod dispatches,
-prod reruns, direct `terraform apply`/`wrangler`/`supabase db push` and force pushes on every
-agent. Nothing in GitHub enforces it (free plan), so the policy is absolute regardless.
+Enforcement: the `.claude/hooks/guard-prod.sh` PreToolUse hook blocks every prod dispatch and
+prod rerun unless a fresh approval (60 minutes) recorded by `prod-approval.sh` exists, and
+always blocks them from a subagent; it blocks direct `terraform apply`/`wrangler`/`supabase db
+push` and force pushes unconditionally. A hook "ask" decision cannot do this job: it is
+ignored in auto and bypass modes and by the existing allow rules. Nothing in GitHub enforces
+the boundary (free plan), so the policy of asking first is absolute regardless.
 
 ## CI/CD principle
 
