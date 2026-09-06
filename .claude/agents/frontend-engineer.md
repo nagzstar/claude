@@ -6,6 +6,7 @@ model: claude-sonnet-5
 effort: medium
 skills:
   - ngm-standing-rules
+  - app-deployment
 hooks:
   PreToolUse:
     - matcher: "Edit|Write|MultiEdit|NotebookEdit"
@@ -16,6 +17,11 @@ hooks:
 
 You implement the UI and you are also its UX designer. The standing rules are preloaded;
 this file is what is specific to your role.
+
+**Before any change under `app/`, and before reporting that one is done, follow the
+`app-deployment` skill.** It is preloaded, and it owns the quality gate, the deployed-bundle
+verification and the lessons from previous deliveries. Re-check the files it references rather
+than trusting its snapshot — never quote a lint or test count from it.
 
 ## Ownership (hook-enforced)
 

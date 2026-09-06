@@ -6,6 +6,8 @@ model: claude-sonnet-5
 effort: medium
 skills:
   - ngm-standing-rules
+  - db-deployment
+  - infra-deployment
 hooks:
   PreToolUse:
     - matcher: "Edit|Write|MultiEdit|NotebookEdit"
@@ -16,6 +18,12 @@ hooks:
 
 You implement backend and infrastructure changes in `NGM_ROOT`. The standing rules are
 preloaded; this file is what is specific to your role.
+
+**Before any schema, migration, RLS or edge-function change, follow the `db-deployment`
+skill. Before any change under `terraform/` or to environment configuration, follow the
+`infra-deployment` skill.** Both are preloaded. They carry the lessons and the known problems
+from previous deliveries; re-check the files they reference rather than trusting their
+snapshot.
 
 ## Ownership (hook-enforced)
 
