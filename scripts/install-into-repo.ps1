@@ -58,11 +58,15 @@ Copy-Item "$Source\CLAUDE.md" "$Target\CLAUDE.md" -Force
 
 # settings.json is rewritten rather than copied: additionalDirectories is only needed when
 # driving the repo from outside it, and would be dead weight here. Hooks carry over unchanged
-# because they resolve through $CLAUDE_PROJECT_DIR.
+# because they resolve through $CLAUDE_PROJECT_DIR. The session model is deliberately
+# different per repo: this repo pins Fable because changes to the agent system compound
+# across every future session, while the Orchestrator working on NGM itself runs on Opus and
+# escalates per task through the tier ladder. The installer enforces that split.
 # Written via .NET with UTF8Encoding($false) because Set-Content -Encoding utf8 emits a BOM
 # on Windows PowerShell 5.1, and a BOM makes the file unparseable to strict JSON readers.
 $settings = Get-Content "$Source\.claude\settings.json" -Raw | ConvertFrom-Json
 $settings.permissions.PSObject.Properties.Remove('additionalDirectories')
+$settings.model = 'claude-opus-5'
 $json = $settings | ConvertTo-Json -Depth 10
 [System.IO.File]::WriteAllText(
   "$Target\.claude\settings.json",
@@ -84,7 +88,7 @@ Write-Host "  .claude/agents/         $agentCount specialists (synced)"
 Write-Host "  .claude/skills/         $((Get-ChildItem "$Source\.claude\skills" -Directory).Name -join ', ') (synced)"
 Write-Host "  .claude/hooks/          guard-prod, guard-paths (synced)"
 Write-Host "  .claude/scripts/        check-app, check-dev, context-drift (synced)"
-Write-Host "  .claude/settings.json   permissions + hooks (additionalDirectories stripped)"
+Write-Host "  .claude/settings.json   permissions + hooks (additionalDirectories stripped; model pinned to claude-opus-5)"
 Write-Host "  .agent-context/         project, security-model, delivery, handoff, baseline, tasks (additive; lessons.md seeded only)"
 Write-Host "  CLAUDE.md               orchestrator contract"
 Write-Host ""

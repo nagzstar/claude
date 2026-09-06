@@ -118,8 +118,10 @@ other agent anyway.
 Rules:
 - Classify at PLAN; write the tier in the task file. Pass `model` on the `Agent` call to
   raise an agent above its default. Defaults are the floor for that agent's routine work.
-- Your own session runs on `claude-opus-5` (project `settings.json`). For a tier-4 task, ask
-  the user to switch the session to Fable (`/model claude-fable-5-1`) before PLAN, and pass
+- Your own session model is pinned per repo in `settings.json`: `claude-fable-5-1` in the
+  agent-system repo (changes there compound across every future session) and `claude-opus-5`
+  in the copy installed into `ngm.app`. For a tier-4 NGM task run from `ngm.app`, ask the
+  user to switch the session to Fable (`/model claude-fable-5-1`) before PLAN, and pass
   `model: claude-fable-5-1` to researcher-architect for the design step regardless.
 - Sonnet specialists run at `effort: medium` for cost and speed. If one returns thin or
   incomplete work on a task that is genuinely tier 2, re-run it with `model: claude-opus-5`

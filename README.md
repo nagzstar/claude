@@ -54,10 +54,11 @@ Lifecycle for every non-trivial task: `PLAN → DELEGATE → EXECUTE → VERIFY 
 
 Defaults are in each agent's frontmatter; the Orchestrator raises a model per invocation
 when the tier calls for it, and escalates one tier after two failed correction rounds.
-Security review and RLS work never run below Opus. The orchestrator session itself is
-pinned to `claude-opus-5` in `.claude/settings.json` (switch to Fable with `/model` for a
-tier-4 task); Sonnet specialists run at `effort: medium` for cost and speed, with Opus as the
-escalation when a result is thin.
+Security review and RLS work never run below Opus. The orchestrator session is pinned per
+repo in `.claude/settings.json`: `claude-fable-5-1` here, where a change to the system shapes
+every future session, and `claude-opus-5` in the copy installed into `ngm.app` (switch to
+Fable with `/model` for a tier-4 task); Sonnet specialists run at `effort: medium` for cost
+and speed, with Opus as the escalation when a result is thin.
 
 A **mobile version** is on the roadmap (see `project.md`); its approach is a tier-4 decision
 made with you before any code, so no mobile agent exists yet.
@@ -88,6 +89,7 @@ CLAUDE.md                          Orchestrator contract (always in context)
 .claude/agents/*.md                Six specialists — model, tools, ownership hook, role prompt
 .claude/skills/ngm-standing-rules  Rules preloaded into every specialist (single source)
 .claude/skills/ngm-facts           Environment, cost and deployment-authority facts
+.claude/skills/ngm-feature-prompt  How to write a pasteable multi-phase feature prompt (prompts/)
 .claude/hooks/                     guard-prod.sh, guard-paths.sh
 .claude/scripts/                   check-app.sh, check-dev.sh, context-drift.sh
 .claude/settings.json              Permissions + the prod guard hook
@@ -98,6 +100,7 @@ CLAUDE.md                          Orchestrator contract (always in context)
 .agent-context/handoff.md          Delegation, correction and task-file formats
 .agent-context/tasks/              Per-task shared state and resume point (tracked in both repos)
 .agent-context/lessons.md          Cumulative lessons learnt + backlog of problems spotted (tracked)
+prompts/                           Feature prompts the user pastes to start large, multi-phase work
 evals/                             Routing cases + runner (costs tokens); see evals/README.md
 scripts/validate.sh                Deterministic self-test (free) — also runs in CI
 scripts/install-into-repo.ps1      Deploy the system into the NGM repo (gitignored there)
