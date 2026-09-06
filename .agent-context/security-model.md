@@ -69,3 +69,19 @@ Current CORS is `Access-Control-Allow-Origin: *`. Acceptable because every funct
 4. New tables: `ENABLE ROW LEVEL SECURITY` in the same migration that creates them, plus explicit policies. An RLS-enabled table with no policy denies all — a table with RLS *off* is exposed via PostgREST.
 5. Policies are **permissive and OR'd together**. One loose policy defeats every strict one on that table. Always check the full set for a table, not just the policy being added.
 6. Later migrations supersede earlier ones. Always read migrations in filename order before concluding a policy exists.
+
+## Addendum — 2026-09-06 signup/approval change (NOT yet re-verified above)
+
+Commit `4a149c7` ("Add self-signup with admin account approval", migration
+`20260906013534_user_signup_approval.sql`) landed after this document was verified. Per the
+ratified design in the task record it: adds `profiles.approval_status`
+(`pending|approved|rejected`, default `approved`); adds `public.is_approved(uuid)`
+(security definer, admin bypass, also honours `is_active`) and gates the SELECT/INSERT/UPDATE
+policies on `messages`, `responses`, `tags`, `resources`, `announcements` with it by
+**replacing the policies by name**; adds a `handle_new_user` trigger on `auth.users` that
+clamps the requested role to `mentor|participant`; restricts `authenticated` UPDATE on
+`profiles` to a column grant list and adds `WITH CHECK` to the profiles UPDATE policy; gates
+`get_public_profiles` and `get_user_counts`. The policy matrix above therefore **understates**
+current enforcement. Re-verify against the migration and fold it into the matrix at the next
+architecture update; until then, `is_approved()` is a fourth security-definer function to
+audit on any change.

@@ -1,0 +1,34 @@
+name: Validate agent system
+
+# Deterministic self-test only (scripts/validate.sh) — no model calls, ~20 seconds of
+# Actions minutes, and only when something that matters changes.
+on:
+  push:
+    branches: [main]
+    paths:
+      - CLAUDE.md
+      - .claude/**
+      - .agent-context/**
+      - scripts/**
+      - evals/**
+      - .github/workflows/validate.yml
+  workflow_dispatch:
+
+concurrency:
+  group: validate-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: bash scripts/validate.sh
+        env:
+          # No NGM checkout in CI; the path-guard cases only need a consistent root.
+          NGM_ROOT: /tmp/ngm.app

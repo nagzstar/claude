@@ -1,4 +1,5 @@
 {
+  "model": "claude-opus-5",
   "permissions": {
     "additionalDirectories": [
       "C:/Users/nagaj/git/ngm.app"
@@ -9,9 +10,12 @@
       "Bash(npm run test)",
       "Bash(npm ci)",
       "Bash(npm install)",
+      "Bash(bash .claude/scripts/*)",
+      "Bash(bash \"$CLAUDE_PROJECT_DIR/.claude/scripts/*)",
       "Bash(git status)",
       "Bash(git diff:*)",
       "Bash(git log:*)",
+      "Bash(git rev-parse:*)",
       "Bash(git add:*)",
       "Bash(git commit:*)",
       "Bash(git checkout:*)",
@@ -25,12 +29,14 @@
       "Bash(gh run rerun:*)",
       "Bash(gh workflow list:*)",
       "Bash(gh workflow view:*)",
+      "Bash(gh workflow run:*)",
       "Bash(gh pr list:*)",
       "Bash(gh pr view:*)",
-      "Bash(gh pr create:*)",
       "Bash(gh api repos/:*)",
       "Bash(terraform fmt:*)",
-      "Bash(terraform validate:*)"
+      "Bash(terraform validate:*)",
+      "Bash(terraform plan:*)",
+      "Bash(curl -sS:*)"
     ],
     "deny": [
       "Read(**/.env)",
@@ -39,10 +45,25 @@
       "Bash(terraform destroy:*)",
       "Bash(supabase db reset:*)",
       "Bash(supabase db push:*)",
+      "Bash(supabase functions deploy:*)",
       "Bash(wrangler deploy:*)",
       "Bash(wrangler pages deploy:*)",
       "Bash(git push --force:*)",
       "Bash(git push -f:*)"
+    ]
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/guard-prod.sh\"",
+            "timeout": 30
+          }
+        ]
+      }
     ]
   }
 }

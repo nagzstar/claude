@@ -2,6 +2,8 @@
 
 Status: NOT STARTED | IN PROGRESS | IN REVIEW | BLOCKED | DONE
 Owner: Orchestrator
+Tier: 2 | 3 | 4   (models actually used are logged below)
+Base commit: <sha of NGM main when work started>
 Updated: <date>
 
 ## Goal
@@ -13,8 +15,9 @@ One paragraph, in user terms.
 3.
 
 ## Architecture Decisions
-Data model, API/contract, authorization rule (who may create/read/update/delete/approve),
-frontend vs backend responsibility, migration strategy, mobile behaviour.
+Data model, API/contract, authorization rule (who may create/read/update/delete/approve) and
+where it is enforced, frontend vs backend responsibility, migration strategy and
+compatibility with the deployed frontend, mobile behaviour.
 Decided once, here. Implementing agents follow this rather than redesigning.
 
 ## Relevant Files
@@ -23,15 +26,34 @@ Decided once, here. Implementing agents follow this rather than redesigning.
 |  |  |  |
 
 ## Agent Assignments
-| Agent | Scope | Status |
-|---|---|---|
-|  |  |  |
+| Agent | Model | Scope | Status |
+|---|---|---|---|
+|  |  |  |  |
+
+## Lifecycle
+- [ ] PLAN — criteria, tier, contract, ownership written
+- [ ] DELEGATE — handoffs sent
+- [ ] EXECUTE — engineers COMPLETE
+- [ ] VERIFY — qa-engineer PASS; security-reviewer PASS (if required)
+- [ ] REVIEW — quality gate applied; corrections ≤ 2 rounds
+- [ ] INTEGRATE — committed <sha>, pushed, check-dev PASS, behaviour validated on DEV
+- [ ] COMPLETE — reported; context files updated if architecture changed
 
 ## Status / Log
-- <date> — what happened, decisions made.
+- <date> — what happened, decisions made, models used, escalations.
 
 ## Test Results
-Build / lint / unit results and QA PASS-FAIL-WARNING summary.
+check-app summary line; QA PASS/FAIL/WARNING summary; security-reviewer summary; check-dev result.
 
 ## Remaining Risks
-Anything unresolved, unverified, or deferred.
+Anything unresolved, unverified, or deferred — including what the user must know before PROD.
+
+## Lessons Learnt
+What would be done differently, what surprised the team, what a future task must know.
+Durable ones are appended to `.agent-context/lessons.md` at COMPLETE.
+
+## Problems Spotted (out of scope for this task)
+| Problem | Owner | Tier |
+|---|---|---|
+|  |  |  |
+Copied to the backlog in `.agent-context/lessons.md` at COMPLETE.

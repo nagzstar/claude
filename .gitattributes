@@ -1,0 +1,6 @@
+# Shell scripts run under Git Bash and in CI; CRLF would break them.
+*.sh  text eol=lf
+*.md  text
+*.json text
+*.yml text
+*.ps1 text eol=crlf

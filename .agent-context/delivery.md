@@ -32,7 +32,8 @@ re-fails the job. **Never applies from a PR.** Correct as designed.
 Runs `init` → `apply -auto-approve` → `output`. The deliberate design note in the file:
 GitHub Environment protection rules are not free on private repos and HCP auto-apply is off,
 so **a human dispatching the workflow is the approval gate**. Respect that reasoning; if you
-want a stronger gate, propose it, do not silently rewire it.
+want a stronger gate, propose it, do not silently rewire it. Claude may dispatch it for
+**dev** only; the `guard-prod` hook blocks a prod dispatch.
 
 **State/config**: HCP Terraform. `TF_WORKSPACE=ngm-<env>` selects the workspace; each
 workspace supplies its own secrets and its own `-var-file` via `TF_CLI_ARGS_plan`/`_apply`,
@@ -47,7 +48,8 @@ from `secrets.TF_API_TOKEN`. Terraform manages two local modules, `./modules/sup
 Steps: checkout → setup-node 20 (npm cache on `app/package-lock.json`) → `npm ci` →
 `npm test` → `npm run build` → `cloudflare/wrangler-action@v3` `pages deploy dist`
 to project `ngm-<env>`. `environment:` is set per run, so dev and prod use the **same secret
-names with different values**.
+names with different values**. Because tests run inside this job, the dev deploy *is* the
+application's CI.
 
 **`database-migration.yml`** — push to `main` under `supabase/migrations/**` or
 `supabase/functions/**` migrates dev automatically; dispatch for prod.
@@ -73,77 +75,85 @@ Cloudflare wiring lives in `terraform/modules/cloudflare`: a Pages project, a
 `pages.dev` subdomain (proxying is what allows a CNAME at the zone apex, via CNAME
 flattening). All four workflows have real successful runs in history.
 
-**Deployment authority: DEV is Claude's, PROD is the user's.** Because branch protection and
-environment required-reviewers are unavailable on this plan, nothing technically prevents a
-`workflow_dispatch` with `environment: prod`. The production gate is therefore **policy**, and
-must be treated as absolute precisely because no system enforces it. GitHub Pro would technically
-enable both controls, but it is a **paid plan and therefore ruled out** by the free-tier
-requirement — policy is the gate.
+**Deployment authority: DEV is Claude's, PROD is the user's.** Nothing in GitHub prevents a
+`workflow_dispatch` with `environment: prod` on this plan. The production gate is therefore
+**policy plus the local `guard-prod` hook**, and must be treated as absolute precisely because
+GitHub does not enforce it. GitHub Pro would enable branch protection and required reviewers
+but is a **paid plan and therefore ruled out**.
+
+**Tooling:** `bash .claude/scripts/check-dev.sh [--sha <sha>]` reports the runs for a commit
+and the dev HTTP status; `gh run view <id> --log-failed` for diagnosis.
 
 ## Cost constraint — free or as close to free as possible
 
 **Hard requirement.** The whole stack is on free tiers and the only recurring cost is the
-`nextgenmaher.com` domain. Never add a paid plan, add-on, runner or service without asking
-the user first. Full detail in the `ngm-facts` skill; the delivery-specific consequences are:
+`nextgenmaher.com` domain. Delivery-specific consequences:
 
-- **GitHub Actions minutes are the scarcest resource in the stack.** They are the binding
-  constraint on how ambitious CI can be. This is a further reason path-based triggers matter:
-  never widen a filter so unrelated changes burn minutes. Prefer one well-targeted job over
-  several broad ones, and prefer adding a step to an existing job over adding a new job.
+- **GitHub Actions minutes are the scarcest resource in the stack** and the binding
+  constraint on CI ambition. Never widen a path filter so unrelated changes burn minutes;
+  prefer one well-targeted job over several, and a step in an existing job over a new job.
 - **No self-hosted or larger runners.** GitHub-hosted `ubuntu-latest` only.
-- **No commercial scanning or deployment products.** The gaps below can all be closed with
-  free tooling — `npm audit`, Dependabot, and OSS Actions such as tfsec/checkov/trivy.
-- **HCP Terraform free tier is capped at 500 managed resources.** The current stack is far
-  below it, but count the cost of anything that would create resources in bulk.
-- **Supabase free plan allows 2 projects, and dev + prod already use both.** There is no room
-  for a third environment even if one were wanted.
+- **No commercial scanning or deployment products.** The gaps below close with free tooling —
+  `npm audit`, Dependabot, and OSS Actions such as tfsec/checkov/trivy.
+- **HCP Terraform free tier is capped at 500 managed resources.**
+- **Supabase free plan allows 2 projects, and dev + prod already use both.** No third
+  environment is possible even if one were wanted.
 - Free Supabase projects **pause after inactivity**. A failed dev validation may mean the dev
   project is paused rather than the code being broken — check that before debugging.
 
 ## Known gaps and constraints — read before "improving" anything
 
 1. **Build-once-promote is not currently possible.** Vite inlines `VITE_SUPABASE_*` at
-   **build time**, so the artefact is inherently environment-specific and dev and prod are
-   separate builds. This is a genuine architectural constraint, not an oversight. Moving to
-   promote-one-artefact requires switching to **runtime** configuration (e.g. fetching config
-   from a static endpoint on boot), which is an application change with its own risks. Raise
-   it as a decision; do not half-implement it.
+   **build time**, so the artefact is environment-specific and dev and prod are separate
+   builds. Moving to promote-one-artefact requires **runtime** configuration — an application
+   change (tier 4) with its own risks. Raise it as a decision; do not half-implement it.
 
-2. **There is no PR pipeline for application code.** `terraform-plan.yml` runs on PRs, but
-   `deploy.yml` runs only on push to `main` and manual dispatch. App tests therefore run
-   *after* merge, at deploy time. This is the largest real gap against the intended flow and
-   the highest-value thing to fix — a PR-triggered `npm ci` + `npm test` + `npm run build` job.
+2. **There is no pre-merge pipeline for application code.** Work goes straight to `main`,
+   so app tests run at deploy time. The local gate (`check-app.sh`, run by every engineer and
+   by the Orchestrator before pushing) is the pre-push equivalent. A PR-triggered job is only
+   worth its minutes if the user ever adopts a PR workflow.
 
 3. **Do NOT add `npm run lint` as a blocking step** without first clearing the baseline.
-   Lint currently fails on untouched `main` with 22 errors and 14 warnings (see
-   `project.md`). Adding it as a gate would red-build every PR on day one. Either fix the
-   baseline first as its own task, or add it non-blocking.
+   Lint fails on untouched `main` (see `.agent-context/baseline.json`). Adding it as a gate
+   would red-build every run. Either fix the baseline first as its own task, or add it
+   non-blocking.
 
 4. **Migration and app deploy ordering is unmanaged.** They are independent workflows with
-   disjoint path filters. A single merge touching both `app/**` and `supabase/migrations/**`
+   disjoint path filters. A single push touching both `app/**` and `supabase/migrations/**`
    starts both **concurrently**, with no guarantee migrations land first. Backwards-compatible,
    additive migrations are what currently makes this safe. For any breaking schema change,
    sequencing must be handled deliberately — expand/contract, or an explicit ordered run.
 
-5. **No dependency or IaC security scanning** anywhere — no `npm audit`, no tfsec/checkov/trivy.
+5. **No dependency or IaC security scanning** — no `npm audit`, no tfsec/checkov/trivy, no
+   Dependabot config. All free; each costs minutes only when it runs, so scope triggers narrowly.
 
-6. **No post-deploy verification** — no health check or smoke test after a Pages deploy or a
-   migration. Nothing confirms a release is good beyond the deploy step exiting 0.
+6. **No post-deploy verification** — nothing confirms a release beyond the deploy step exiting
+   0. A `curl -f` of the site after `pages deploy` is a free, seconds-long smoke check.
 
 7. **No documented rollback.** Cloudflare Pages retains previous deployments, so app rollback
    is redeploying a prior deployment. **Migrations are forward-only with no down migrations** —
-   database rollback means writing a new corrective migration. Treat every migration as
+   database rollback means writing a corrective migration. Treat every migration as
    irreversible when assessing risk.
 
 8. **`cancel-in-progress: true` on `deploy.yml`** can cancel an in-flight production deploy if
-   another run starts. `database-migration.yml` and `terraform-apply.yml` correctly use `false`.
+   another prod run starts. `database-migration.yml` and `terraform-apply.yml` correctly use `false`.
 
 9. **Long-lived secrets, no OIDC.** `CLOUDFLARE_API_TOKEN`, `SUPABASE_ACCESS_TOKEN`,
-   `SUPABASE_DB_PASSWORD`, `TF_API_TOKEN`. Cloudflare and Supabase do not offer the
-   GitHub-OIDC federation that AWS/Azure/GCP do, so this is largely a constraint rather than a
-   fixable defect. Rotation and least-privilege token scoping are the realistic controls.
+   `SUPABASE_DB_PASSWORD`, `TF_API_TOKEN`. Cloudflare and Supabase do not offer GitHub-OIDC
+   federation, so this is a constraint rather than a defect. Rotation and least-privilege
+   token scoping are the realistic controls.
 
-10. **No branch protection, and none is wanted.** It is unavailable on the free plan, and the user has confirmed GitHub Pro is not needed. **Work directly on `main`** — pushes go straight to it, which is what triggers the dev deploy. PRs remain available but are not required and are not enforced. Never write a pipeline that assumes a PR gate exists.
+10. **No branch protection, and none is wanted.** Work directly on `main`. Never write a
+    pipeline that assumes a PR gate exists.
+
+11. **Actions are pinned to major tags, not commit SHAs** (`actions/checkout@v4`,
+    `supabase/setup-cli@v1`, `cloudflare/wrangler-action@v3`, …), and `supabase/setup-cli`
+    uses `version: latest`, so a migration run is not reproducible and a compromised tag
+    would flow straight into deploys. SHA-pinning plus a fixed Supabase CLI version is free.
+
+12. **Edge functions are deployed with `verify_jwt = false`** (`supabase/config.toml`) and
+    verify the Bearer token in code instead. That is the established pattern and works, but
+    every new function must replicate the in-code check — the platform will not do it.
 
 ## Identity separation (current, and correct in principle)
 

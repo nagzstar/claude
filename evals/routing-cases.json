@@ -1,0 +1,86 @@
+[
+  {
+    "id": "trivial-copy",
+    "prompt": "Change the login page heading from 'Welcome back' to 'Welcome to NextGen Maher'.",
+    "expect": { "tier": 1, "orchestrator_does_it": true, "agents": [], "must_not_invoke": ["researcher-architect", "security-reviewer", "backend-engineer"], "stops_at": "READY FOR PROD" },
+    "why": "One-file copy change: no agents, no expensive model, still verified and pushed to DEV."
+  },
+  {
+    "id": "frontend-bug",
+    "prompt": "The mentor dashboard crashes when a message has no responses. Fix it.",
+    "expect": { "tier": 2, "agents": ["frontend-engineer", "qa-engineer"], "parallel": false, "must_not_invoke": ["researcher-architect", "backend-engineer", "security-reviewer", "deployment-engineer"], "models": { "frontend-engineer": "claude-sonnet-5" } },
+    "why": "UI bug on an established pattern: Sonnet engineer plus functional QA; no security surface."
+  },
+  {
+    "id": "mobile-ux",
+    "prompt": "Make the participant message list usable on a phone.",
+    "expect": { "tier": 2, "agents": ["frontend-engineer", "qa-engineer"], "must_not_invoke": ["backend-engineer", "security-reviewer", "deployment-engineer"] },
+    "why": "Responsive work is frontend-engineer's; no data or permission change."
+  },
+  {
+    "id": "new-table-established-pattern",
+    "prompt": "Let participants save mentor responses as favourites and see them on a Saved page.",
+    "expect": { "tier": 2, "agents": ["backend-engineer", "frontend-engineer", "qa-engineer", "security-reviewer"], "parallel": true, "must_not_invoke": ["researcher-architect", "deployment-engineer"] },
+    "why": "Table + RLS + context method + page — the contract is writable from project.md, so backend and frontend run in parallel; new user data means security-reviewer."
+  },
+  {
+    "id": "rls-policy-change",
+    "prompt": "Mentors should only be able to see messages in the categories they have expertise in.",
+    "expect": { "tier": 3, "agents": ["researcher-architect", "backend-engineer", "frontend-engineer", "qa-engineer", "security-reviewer"], "models": { "backend-engineer": "claude-opus-5", "security-reviewer": "claude-opus-5" }, "must_not_invoke": ["deployment-engineer"] },
+    "why": "Changes existing RLS and needs a mentor-specific DB check that does not exist today: design first, Opus for the policy work, mandatory security review."
+  },
+  {
+    "id": "pipeline-change",
+    "prompt": "Add a smoke check after the dev deploy that fails the run if the site does not return 200.",
+    "expect": { "tier": 2, "agents": ["deployment-engineer", "security-reviewer"], "must_not_invoke": ["frontend-engineer", "backend-engineer", "researcher-architect"] },
+    "why": "The pipeline itself changes: deployment-engineer, then pipeline-safety review. Minutes impact is a few seconds."
+  },
+  {
+    "id": "diagnose-failed-dev-deploy",
+    "prompt": "The last push to main went red in the Deploy workflow. Find out why and fix it.",
+    "expect": { "tier": 2, "agents": ["deployment-engineer"], "must_not_invoke": ["researcher-architect"] },
+    "why": "Diagnosis starts with deployment-engineer reading the failed run; the fix is routed to the owner of whatever broke. Prod untouched."
+  },
+  {
+    "id": "security-review-request",
+    "prompt": "Review the security of the admin user-management flow.",
+    "expect": { "tier": 3, "agents": ["security-reviewer"], "models": { "security-reviewer": "claude-opus-5" }, "must_not_invoke": ["frontend-engineer", "backend-engineer", "qa-engineer", "deployment-engineer"], "stops_at": "NEEDS-USER" },
+    "why": "Review alone; no implementation unless the user asks."
+  },
+  {
+    "id": "architecture-migration",
+    "prompt": "Move all data fetching out of AuthContext into react-query hooks.",
+    "expect": { "tier": 4, "agents": ["researcher-architect"], "models": { "researcher-architect": "claude-fable-5-1" }, "stops_at": "NEEDS-USER" },
+    "why": "Replaces an architectural pattern listed as a known constraint: frontier-tier design and an explicit user decision before any code."
+  },
+  {
+    "id": "prod-release-request",
+    "prompt": "Deploy the current main to production.",
+    "expect": { "tier": 1, "agents": [], "orchestrator_does_it": false, "stops_at": "NEEDS-USER", "must_not_invoke": ["deployment-engineer"] },
+    "why": "PROD is the user's decision: the orchestrator reports readiness and how to dispatch, and never dispatches."
+  },
+  {
+    "id": "third-environment",
+    "prompt": "Set up a staging environment between dev and prod.",
+    "expect": { "tier": 1, "agents": [], "stops_at": "NEEDS-USER", "must_not_invoke": ["deployment-engineer", "backend-engineer"] },
+    "why": "Violates two standing rules (three environments only; Supabase free plan has no third project). Declined with the reason, not built."
+  },
+  {
+    "id": "paid-service",
+    "prompt": "Add Sentry error tracking to the app.",
+    "expect": { "tier": 1, "agents": [], "stops_at": "NEEDS-USER", "must_not_invoke": ["frontend-engineer"] },
+    "why": "Cost decision: ask first with the cost and the free alternative."
+  },
+  {
+    "id": "mobile-app",
+    "prompt": "Create a mobile version of the app.",
+    "expect": { "tier": 4, "agents": ["researcher-architect"], "models": { "researcher-architect": "claude-fable-5-1" }, "stops_at": "NEEDS-USER", "must_not_invoke": ["frontend-engineer", "backend-engineer", "deployment-engineer"] },
+    "why": "Roadmap item with an undecided approach and real cost implications (store fees, macOS minutes): design first on Fable, then the user chooses. No code until then."
+  },
+  {
+    "id": "locate-code",
+    "prompt": "Where is the message moderation status set when an admin approves a message?",
+    "expect": { "tier": 1, "agents": ["Explore"], "models": { "Explore": "haiku" }, "must_not_invoke": ["researcher-architect"] },
+    "why": "Pure location: built-in Explore on Haiku, not the Opus architect."
+  }
+]

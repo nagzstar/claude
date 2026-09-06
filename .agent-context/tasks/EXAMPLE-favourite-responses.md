@@ -6,6 +6,8 @@ real tasks; it exists to show the shape.
 
 Status: EXAMPLE (not implemented)
 Owner: Orchestrator
+Tier: 2 (established pattern: table + RLS + context method + page)
+Base commit: n/a (example)
 Updated: 2026-09-06
 
 ## Goal
@@ -95,7 +97,8 @@ uses the same card list as `ParticipantMessages`, not a table.
 |---|---|---|
 | backend-engineer | migration + RLS | — |
 | frontend-engineer | types, context, control, page, route, nav | — |
-| qa-security | verification + authz testing | — |
+| qa-engineer | functional verification + tests | — |
+| security-reviewer | authorization review | — |
 
 Backend and frontend run **in parallel** — the contract above is fixed, and their file sets
 are disjoint. researcher-architect is **not** invoked.

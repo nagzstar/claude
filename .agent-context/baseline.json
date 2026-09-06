@@ -1,0 +1,11 @@
+{
+  "_comment": "Accepted state of ngm.app main. Read by .claude/scripts/check-app.sh; the gate is 'no NEW lint problems' and 'no fewer tests'. Update only via check-app.sh --update-baseline after the user agrees the new numbers are accepted.",
+  "lint": {
+    "errors": 22,
+    "warnings": 14
+  },
+  "tests": {
+    "count": 1
+  },
+  "verified": "2026-09-06"
+}
