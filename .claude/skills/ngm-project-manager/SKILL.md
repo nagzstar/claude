@@ -95,18 +95,35 @@ has agreed it, and Open questions is empty. Only the user can say an issue is re
 
 ## Prioritising
 
-Propose an order for everything `ready`, with one line of reasoning each: user value, what
-it unblocks, dependency order (`Depends on`), risk, size. The user confirms or reorders; then
-apply `P1`/`P2`/`P3`. Do not rank `needs-info`, `blocked` or `needs-decision` items above
-things that can start today. Present the result as a short table; never move or close an
-issue the user did not ask about.
+The order is a **single numbered delivery sequence**, not priority buckets (user decision,
+2026-09-07): when work is assigned there is exactly one "next" ticket. It lives in the pinned
+issue **"Delivery order"** on the repo, whose body is the numbered list; the PM rewrites that
+body whenever the order changes, and `P1`/`P2`/`P3` are only a coarse summary derived from it
+(top third, middle, rest) for the list view.
+
+How to propose one:
+
+- **Always show titles.** Every ticket put to the user — in prose, in a table, in an
+  `AskUserQuestion` option — carries its title next to its number. A bare "#4, #9, #3" is
+  unanswerable.
+- **Dependencies are discussed, not decided.** Mark each forced ordering explicitly ("Find a
+  Mentor must follow My Profile: search covers the specialty set") and each soft one ("UX
+  refresh is better before the new pages so they are built in the new look"), and agree them
+  with the user. Never encode a dependency silently in the order or in `Depends on` alone.
+- One line of reasoning per item: user value, what it unblocks, risk, size. Features and debt
+  go in the **same** sequence. Do not place `needs-info`, `blocked` or `needs-decision` items
+  above things that can start today; say where they slot in once unblocked.
+- The user confirms or reorders; then write the pinned issue and apply the summary labels.
+  Never move or close an issue the user did not ask about.
 
 ## Picking the next feature and running it
 
-1. Choose: lowest P, then `ready` before anything else, then oldest. Skip `needs-decision`
-   and `blocked` unless their latest comment shows the user answered. Say which and why in
-   two sentences, then ask **once** ("Start #N now?") — a feature session is long and cannot
-   be un-run. When the user said "work through the ready items", do not ask per item.
+1. Choose: the first item in the pinned "Delivery order" issue that is open and `ready`
+   (fall back to lowest P, then oldest, if the pinned issue is missing). Skip
+   `needs-decision` and `blocked` unless their latest comment shows the user answered. Say
+   which and why in two sentences — with its title — then ask **once** ("Start #N <title>
+   now?") — a feature session is long and cannot be un-run. When the user said "work through
+   the ready items", do not ask per item.
 2. `bash .claude/scripts/pm-run-issue.sh <n>` — **in the background** (it outlives a
    foreground tool call), then wait for it to finish; the harness tells you when. Tail the
    `.log` it names if the user asks how it is going. **One feature at a time**, always a new
