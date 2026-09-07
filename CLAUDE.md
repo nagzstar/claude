@@ -114,12 +114,12 @@ reference it; a batch has one task file, one commit per member, one push and one
 | Agent | Owns (hook-enforced) | Default model | Invoke when |
 |---|---|---|---|
 | `Explore` (built-in) | nothing (read-only) | haiku | locating code, sweeping many files for a conclusion |
-| `researcher-architect` | `.agent-context/` only | claude-opus-5 | you cannot write the contract confidently, or a design must be agreed before coding |
+| `researcher-architect` | `.agent-context/` only | claude-fable-5-1 | you cannot write the contract confidently, or a design must be agreed before coding |
 | `backend-engineer` | `supabase/`, `terraform/` (+ assigned cross-cutting files) | claude-sonnet-5 | DB, migrations, RLS, edge functions, auth, infrastructure |
 | `frontend-engineer` | `app/src/` | claude-sonnet-5 | components, pages, routing, forms, `AuthContext`, responsive, UX |
 | `deployment-engineer` | `.github/workflows/` | claude-sonnet-5 | the **pipeline itself** must change, or a run must be diagnosed |
 | `qa-engineer` | test files + task file | claude-sonnet-5 | verifying any non-trivial change; DEV validation |
-| `security-reviewer` | nothing (read-only) | claude-opus-5 | auth, roles, permissions, user data, migrations, edge functions, Terraform, workflows |
+| `security-reviewer` | nothing (read-only) | claude-opus-5 (**Fable** when the change touches a security-definer function, an RLS predicate or a trigger on a member-writable table) | auth, roles, permissions, user data, migrations, edge functions, Terraform, workflows |
 
 Cross-cutting files (`app/src/types/index.ts`, `app/src/contexts/AuthContext.tsx`,
 `app/src/integrations/supabase/types.ts`) are **yours to assign** — one owner per task, named
@@ -139,8 +139,15 @@ Rules:
   raise an agent above its default. Defaults are the floor for that agent's routine work.
 - Session model is pinned per repo in `settings.json`: Fable in the agent-system repo
   (changes there compound across every session), Opus in the copy installed into `ngm.app`.
-  For a tier-4 NGM task from `ngm.app`, ask the user for `/model claude-fable-5-1` before
-  PLAN, and pass `model: claude-fable-5-1` to researcher-architect for the design regardless.
+  Headless **batch** sessions run the Orchestrator on Fable (`pm-run-issue.sh` default; its
+  own loop is 3–8% of a session's tokens and decides contracts, tiers and correction
+  rounds); a lone ticket runs on Opus. For a tier-4 NGM task from `ngm.app`, ask the user
+  for `/model claude-fable-5-1` before PLAN.
+- **Fable goes where judgement is cheap and decisive, not where tokens are.** The
+  architect (default) and the security reviewer on security-definer, RLS-predicate or
+  trigger changes run on Fable; engineers, QA and Explore never move above the ladder for
+  their tier — they carry most of the tokens (user decision, 2026-09-07; judged on the
+  delivery metrics in ngm.app #31 after the first two batches).
 - Sonnet specialists run at `effort: medium`; thin work on a genuine tier-2 task is re-run
   with `model: claude-opus-5`, not with a nudged prompt.
 - **Escalate** (one tier) when an agent returns `BLOCKED`/`NEEDS-DECISION` because of

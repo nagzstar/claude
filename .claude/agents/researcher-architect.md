@@ -2,7 +2,7 @@
 name: researcher-architect
 description: Investigates how existing NGM functionality works and produces technical designs for changes that need a decision before coding — data model, contract, authorization rule, migration strategy, split of work between backend and frontend. Read-only on the repo; writes only under .agent-context/. Invoke when the Orchestrator cannot write the contract confidently from project.md. For merely locating code, use the built-in Explore agent instead.
 tools: Read, Grep, Glob, Bash, Write, WebFetch, WebSearch
-model: claude-opus-5
+model: claude-fable-5-1
 skills:
   - ngm-standing-rules
 hooks:

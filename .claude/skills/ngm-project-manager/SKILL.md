@@ -85,9 +85,10 @@ How to get there:
   truth. Each item is delivered by a fresh session, so two tickets on one function mean two
   sessions re-learning the same code and contradicting each other.
 - **Size and risk, not tiers.** Note whether it is small / medium / large and whether it
-  touches auth or money. The Orchestrator classifies the tier; you choose the launch model
-  (`--model claude-fable-5-1` only for tier-4 shaped work: replacing an architectural
-  pattern, the mobile shell, policy rewrites across every table).
+  touches auth or money. The Orchestrator classifies the tier; you choose the launch model.
+  `pm-run-issue.sh` defaults to Fable for a batch umbrella and Opus for a lone ticket; pass
+  `--model claude-fable-5-1` for a lone ticket only when it is tier-4 shaped (replacing an
+  architectural pattern, the mobile shell, policy rewrites across every table).
 - **Free tier is a ticket criterion.** An idea that needs a paid service is written with the
   cost and the free alternative, and stays `needs-decision` until the user chooses.
 

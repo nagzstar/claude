@@ -8,7 +8,10 @@
 # backlog grow faster than delivery (user decision, 2026-09-07).
 #
 #   bash .claude/scripts/pm-run-issue.sh <issue-or-batch-number> [options]
-#     --model <id>              session model (default: claude-opus-5; use claude-fable-5-1 for tier-4 work)
+#     --model <id>              session model (default: claude-opus-5 for a single ticket, claude-fable-5-1
+#                               for a batch umbrella — the Orchestrator's own loop is 3–8% of a session's
+#                               tokens and decides contracts, tiers and correction rounds; user decision
+#                               2026-09-07, to be checked against #31 after the first two batches)
 #     --permission-mode <mode>  default: $PM_PERMISSION_MODE or "auto"
 #     --effort <level>          low|medium|high|xhigh|max (default: the CLI default)
 #     --force                   start even if a task file is IN PROGRESS / IN REVIEW / BLOCKED
@@ -32,7 +35,7 @@
 set -u
 NGM_ROOT="${NGM_ROOT:-C:/Users/nagaj/git/ngm.app}"
 REPO="${NGM_REPO:-nagzstar/ngm.app}"
-model="claude-opus-5"
+model="claude-opus-5"; model_set=0
 mode="${PM_PERMISSION_MODE:-auto}"
 effort=""
 force=0; dry=0; print_prompt=0
@@ -42,7 +45,7 @@ die() { echo "pm-run-issue: $*" >&2; exit 2; }
 
 while [ $# -gt 0 ]; do
   case "$1" in
-    --model) model="${2:-}"; shift 2 ;;
+    --model) model="${2:-}"; model_set=1; shift 2 ;;
     --permission-mode) mode="${2:-}"; shift 2 ;;
     --effort) effort="${2:-}"; shift 2 ;;
     --force) force=1; shift ;;
@@ -79,6 +82,10 @@ the rules below say "the issue", read them as follows:
   \`in-progress\` as you start it.
 - ONE task file for the batch: \`.agent-context/tasks/issue-${issue}-batch-<slug>.md\` with
   \`Issue: #${issue}\` and a section per member (its own acceptance criteria and evidence).
+- Members whose files are disjoint may be built in PARALLEL by separate instances of the same
+  specialist (two frontend-engineers, two backend-engineers) under a written contract naming
+  each instance's files; members that touch the same function, table, migration order or
+  page run in sequence. CLAUDE.md's parallel rule applies per instance, not per agent type.
 - One commit per member on main, referencing that member and #${issue}. Do NOT push after each:
   push ONCE when every member is finished or set aside, so the pipeline runs once; then
   \`check-dev\` once and validate every member on DEV in one pass. QA and security review each
@@ -186,8 +193,11 @@ fi
 # A batch umbrella: collect its members from "## Members" (first mention of each #n, in order),
 # drop closed or blocked ones with a warning, and refuse a batch with nobody left to deliver.
 if gh issue view "$issue" -R "$REPO" --json labels --jq '.labels[].name' | grep -qx batch; then
+  # Only the #n that LEADS a list item counts ("1. #58 …", "- #58 …"); a #n mentioned later in
+  # the same line ("moved because the user is delivering #68 …") is prose, not a member.
   listed="$(gh issue view "$issue" -R "$REPO" --json body --jq .body \
-    | sed -n '/^## Members/,/^## /p' | grep -oE '#[0-9]+' | tr -d '#' | awk '!seen[$0]++')"
+    | sed -n '/^## Members/,/^## /p' | tr -d '\r' \
+    | grep -oE '^[[:space:]]*([0-9]+\.|-|\*)[[:space:]]*#[0-9]+' | grep -oE '[0-9]+$' | awk '!seen[$0]++')"
   [ -n "$listed" ] || die "batch #$issue has no '## Members' section listing #n issues"
   for m in $listed; do
     [ "$m" = "$issue" ] && continue
@@ -203,6 +213,7 @@ if gh issue view "$issue" -R "$REPO" --json labels --jq '.labels[].name' | grep 
   done
   [ -n "$members" ] || die "batch #$issue has no open, unblocked member to deliver"
   batch_block="$(build_batch_block)"
+  [ "$model_set" -eq 1 ] || model="claude-fable-5-1"
   echo "pm-run-issue: batch #$issue → members: $(printf '#%s ' $members)"
 fi
 

@@ -129,7 +129,8 @@ case "$cmd" in
   members)
     need_gh; is_number "${1:-}" || die "members needs a batch issue number"
     gh issue view "$1" -R "$REPO" --json body --jq .body \
-      | sed -n '/^## Members/,/^## /p' | grep -oE '#[0-9]+' | tr -d '#' | awk '!seen[$0]++' \
+      | sed -n '/^## Members/,/^## /p' | tr -d '\r' \
+      | grep -oE '^[[:space:]]*([0-9]+\.|-|\*)[[:space:]]*#[0-9]+' | grep -oE '[0-9]+$' | awk '!seen[$0]++' \
       | while read -r m; do
           [ "$m" = "$1" ] && continue
           gh issue view "$m" -R "$REPO" --json number,title,state,labels \
