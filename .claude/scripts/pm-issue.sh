@@ -12,11 +12,14 @@
 #   bash .claude/scripts/pm-issue.sh comment <n> <file>          # post a comment from a markdown file
 #   bash .claude/scripts/pm-issue.sh new <type> "<title>" <body-file> [found-in-issue]
 #                                                                # file a bug/idea, labelled claude + <type>
+#   bash .claude/scripts/pm-issue.sh members <n>                 # a batch's members: number, state, labels, title
 #
 # Statuses (one at a time; none = an unrefined idea):
 #   needs-info → ready → in-progress → ready-for-prod | needs-decision | blocked → (closed = released)
 # Type labels: feature bug improvement infrastructure security ui admin mobile.
 # `claude` marks anything Claude filed on its own initiative (bugs, ideas, problems spotted).
+# `batch` marks an umbrella issue whose "## Members" section lists the issues one session
+# delivers together; pm-run-issue.sh reads that section (user decision, 2026-09-07).
 
 set -u
 REPO="${NGM_REPO:-nagzstar/ngm.app}"
@@ -50,6 +53,7 @@ security|ee0701|Authorization, RLS, secrets, abuse
 ui|1d76db|User interface and UX
 admin|5319e7|Admin-facing features and moderation
 mobile|bfd4f2|PWA / mobile shell / push
+batch|5319e7|Umbrella ticket: one session delivers all its member issues together
 EOF
 }
 
@@ -120,6 +124,18 @@ case "$cmd" in
     need_gh; is_number "${1:-}" || die "comment needs an issue number"
     [ -f "${2:-}" ] || die "comment needs a markdown file as the body"
     gh issue comment "$1" -R "$REPO" --body-file "$2"
+    ;;
+
+  members)
+    need_gh; is_number "${1:-}" || die "members needs a batch issue number"
+    gh issue view "$1" -R "$REPO" --json body --jq .body \
+      | sed -n '/^## Members/,/^## /p' | grep -oE '#[0-9]+' | tr -d '#' | awk '!seen[$0]++' \
+      | while read -r m; do
+          [ "$m" = "$1" ] && continue
+          gh issue view "$m" -R "$REPO" --json number,title,state,labels \
+            --jq '"#\(.number)\t\(.state)\t\([.labels[].name]|join(","))\t\(.title)"' 2>/dev/null \
+            || printf '#%s\tMISSING\n' "$m"
+        done
     ;;
 
   new)

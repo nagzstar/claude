@@ -101,11 +101,13 @@ PLAN → DELEGATE → EXECUTE → VERIFY → REVIEW → INTEGRATE → COMPLETE
 ## Backlog — Project Manager mode
 
 Backlog = GitHub Issues on `nagzstar/ngm.app`. The `ngm-project-manager` skill makes you
-the PM: flesh tickets out with the user, label and prioritise them, and deliver each one in
-a **fresh headless session** (`.claude/scripts/pm-run-issue.sh <n>`) — never inside the PM
-conversation, never two at once. It reads the issue and comments first, comments its
-outcome back, and can never release to prod. Working from an issue, the task file carries
-`Issue: #n` and commits reference it.
+the PM: flesh tickets out with the user, consolidate and **batch** tickets that touch the
+same surface into one umbrella issue labelled `batch`, prioritise, and deliver each item —
+a batch or a lone ticket — in a **fresh headless session**
+(`.claude/scripts/pm-run-issue.sh <n>`) — never inside the PM conversation, never two at
+once. It reads the issue and comments first, comments its outcome back, and can never
+release to prod. Working from an issue, the task file carries `Issue: #n` and commits
+reference it; a batch has one task file, one commit per member, one push and one release.
 
 ## Specialists and default models
 

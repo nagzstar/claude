@@ -1,10 +1,13 @@
 #!/usr/bin/env bash
-# Start ONE fresh, headless Claude Code session inside NGM_ROOT to deliver ONE backlog issue,
-# then return its final report. This is how the Project Manager mode (skill
-# ngm-project-manager) hands a feature to the Orchestrator: a new process per feature, so the
-# PM conversation stays small and each feature gets a full, clean context.
+# Start ONE fresh, headless Claude Code session inside NGM_ROOT to deliver ONE backlog issue —
+# or ONE batch: an umbrella issue labelled `batch` whose "## Members" section lists the issues
+# one session delivers together (one push, one DEV validation, one prod release) — then return
+# its final report. This is how the Project Manager mode (skill ngm-project-manager) hands work
+# to the Orchestrator: a new process per item, so the PM conversation stays small and each
+# item gets a full, clean context. Batches exist because per-session overhead was making the
+# backlog grow faster than delivery (user decision, 2026-09-07).
 #
-#   bash .claude/scripts/pm-run-issue.sh <issue-number> [options]
+#   bash .claude/scripts/pm-run-issue.sh <issue-or-batch-number> [options]
 #     --model <id>              session model (default: claude-opus-5; use claude-fable-5-1 for tier-4 work)
 #     --permission-mode <mode>  default: $PM_PERMISSION_MODE or "auto"
 #     --effort <level>          low|medium|high|xhigh|max (default: the CLI default)
@@ -13,7 +16,10 @@
 #     --print-prompt            print the prompt the session would get and exit (no gh, no git)
 #
 # Refuses a closed issue and any issue labelled `blocked` (no override: the PM lifts the block
-# by setting the status back to `ready` on the user's say-so).
+# by setting the status back to `ready` on the user's say-so). In a batch, a member that is
+# closed or `blocked` is left out with a warning and the rest still run; a batch with no
+# eligible member is refused. `--print-prompt` never calls gh, so it shows the single-issue
+# prompt; use `--dry-run` to see the batch prompt.
 #
 # The session takes as long as the feature takes (typically 20–90 minutes). Run it in the
 # background and tail the .log file it names. It can never reach prod: the guard-prod hook
@@ -54,12 +60,50 @@ done
 session_id="$(node -e 'process.stdout.write(require("crypto").randomUUID())' 2>/dev/null)"
 [ -n "$session_id" ] || die "node is required to generate a session id"
 
+# Filled in by the pre-flight when #issue is a batch umbrella: the eligible member numbers,
+# space-separated, and the block of prompt text that turns one-issue rules into batch rules.
+members=""
+batch_block=""
+
+build_batch_block() {
+  local list="" m
+  for m in $members; do list="${list:+$list, }#$m"; done
+  cat <<EOF
+
+BATCH — READ THIS FIRST. Issue #${issue} is an umbrella labelled \`batch\`; its members are
+${list}, in that order. This session delivers EVERY member. The umbrella's Decisions bind every
+member; a member's own Decisions and comments stand unless the umbrella overrides them. Where
+the rules below say "the issue", read them as follows:
+- Before PLAN, \`pm-issue.sh show\` the umbrella AND every member, and read all of it.
+- Set the umbrella to \`in-progress\` (with the "🚧 Started" comment) and set each member to
+  \`in-progress\` as you start it.
+- ONE task file for the batch: \`.agent-context/tasks/issue-${issue}-batch-<slug>.md\` with
+  \`Issue: #${issue}\` and a section per member (its own acceptance criteria and evidence).
+- One commit per member on main, referencing that member and #${issue}. Do NOT push after each:
+  push ONCE when every member is finished or set aside, so the pipeline runs once; then
+  \`check-dev\` once and validate every member on DEV in one pass. QA and security review each
+  run ONCE over the whole batch, not per member.
+- A member you cannot finish gets its own "❓ NEEDS DECISION" / "⛔ BLOCKED" comment and
+  status, and is set aside; carry on with the rest. Never revert a finished member because a
+  later one failed. A member whose work turns out to be already done or unnecessary gets a
+  comment saying so and \`ready-for-prod\`.
+- Finishing: every finished member → \`ready-for-prod\` plus a short comment (commit sha, what
+  was validated). Then the umbrella gets the full "✅ READY FOR PROD" report listing each
+  member's outcome (READY / NEEDS-DECISION / BLOCKED). The umbrella is READY FOR PROD when at
+  least one member is; it is NEEDS-DECISION or BLOCKED only when no member reached
+  ready-for-prod. Never close any issue — the umbrella or a member.
+- Problems spotted: file an issue only for a genuine defect or risk; fold trivial follow-ups
+  into the member they belong to instead of opening a ticket for each.
+EOF
+}
+
 build_prompt() {
   cat <<EOF
 You are the NGM Orchestrator (CLAUDE.md) working from the GitHub backlog. This headless
 session exists for exactly one issue and ends when that issue is at READY FOR PROD, BLOCKED
 or NEEDS-DECISION. Never start another issue in this session. Nobody is reading this
 conversation live: every question for the user goes into an issue comment, not the chat.
+${batch_block}
 
 YOUR TURN ENDING IS THE SESSION ENDING. This is a single-shot \`claude -p\` run. Nothing
 re-invokes you: the moment you stop producing tool calls, the process exits and every piece
@@ -137,6 +181,29 @@ gh issue view "$issue" -R "$REPO" --json state --jq .state | grep -qx OPEN || di
 if gh issue view "$issue" -R "$REPO" --json labels --jq '.labels[].name' | grep -qx blocked; then
   die "issue #$issue is labelled 'blocked' — skip to the next ready item in the delivery order;
   only the user can lift the block (pm-issue.sh status $issue ready after their say-so)"
+fi
+
+# A batch umbrella: collect its members from "## Members" (first mention of each #n, in order),
+# drop closed or blocked ones with a warning, and refuse a batch with nobody left to deliver.
+if gh issue view "$issue" -R "$REPO" --json labels --jq '.labels[].name' | grep -qx batch; then
+  listed="$(gh issue view "$issue" -R "$REPO" --json body --jq .body \
+    | sed -n '/^## Members/,/^## /p' | grep -oE '#[0-9]+' | tr -d '#' | awk '!seen[$0]++')"
+  [ -n "$listed" ] || die "batch #$issue has no '## Members' section listing #n issues"
+  for m in $listed; do
+    [ "$m" = "$issue" ] && continue
+    mlabels="$(gh issue view "$m" -R "$REPO" --json state,labels --jq '[.state] + [.labels[].name] | join(",")' 2>/dev/null || echo MISSING)"
+    case ",${mlabels}," in
+      *,OPEN,*) ;;
+      *) echo "pm-run-issue: batch #$issue: member #$m is not open — left out" >&2; continue ;;
+    esac
+    case ",${mlabels}," in
+      *,blocked,*) echo "pm-run-issue: batch #$issue: member #$m is labelled 'blocked' — left out (only the user lifts a block)" >&2; continue ;;
+    esac
+    members="${members:+$members }$m"
+  done
+  [ -n "$members" ] || die "batch #$issue has no open, unblocked member to deliver"
+  batch_block="$(build_batch_block)"
+  echo "pm-run-issue: batch #$issue → members: $(printf '#%s ' $members)"
 fi
 
 lock="$NGM_ROOT/.agent-context/.pm-run.lock"

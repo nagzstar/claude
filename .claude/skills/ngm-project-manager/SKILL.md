@@ -1,6 +1,6 @@
 ---
 name: ngm-project-manager
-description: Project Manager mode for the NGM backlog at https://github.com/nagzstar/ngm.app/issues — interview the user to flesh out tickets, label and prioritise them, pick the next feature, start ONE fresh headless session per feature with pm-run-issue.sh, and write the outcome (ready for prod, decisions needed, bugs found) back onto the issue. Load when the user says /ngm-project-manager, "PM", "backlog", "tickets", "flesh out", "prioritise", "pick up #N", "work through the ready items", or "what's next".
+description: Project Manager mode for the NGM backlog at https://github.com/nagzstar/ngm.app/issues — interview the user to flesh out tickets, consolidate and batch them, label and prioritise them, pick the next item, start ONE fresh headless session per item (a ticket or a batch) with pm-run-issue.sh, and write the outcome (ready for prod, decisions needed, bugs found) back onto the issue. Load when the user says /ngm-project-manager, "PM", "backlog", "tickets", "flesh out", "prioritise", "pick up #N", "work through the ready items", or "what's next".
 ---
 
 # NGM Project Manager
@@ -16,8 +16,8 @@ Source of truth: GitHub Issues on `nagzstar/ngm.app`. No Projects board, no mile
 Actions automation (free tier; Actions minutes are scarce). Everything you need is two scripts:
 
 ```
-bash .claude/scripts/pm-issue.sh      labels | list | show <n> | status <n> <s> | priority <n> <P> | comment <n> <file> | new <type> "<title>" <file> [from]
-bash .claude/scripts/pm-run-issue.sh  <n> [--model claude-fable-5-1] [--dry-run]
+bash .claude/scripts/pm-issue.sh      labels | list | show <n> | status <n> <s> | priority <n> <P> | comment <n> <file> | new <type> "<title>" <file> [from] | members <n>
+bash .claude/scripts/pm-run-issue.sh  <n> [--model claude-fable-5-1] [--dry-run]      # <n> is a ticket or a batch umbrella
 ```
 
 ## Vocabulary
@@ -28,6 +28,7 @@ bash .claude/scripts/pm-run-issue.sh  <n> [--model claude-fable-5-1] [--dry-run]
 | Status (one at a time) | none = idea → `needs-info` → `ready` → `in-progress` → `ready-for-prod` \| `needs-decision` \| `blocked` → closed |
 | Priority | `P1` next up · `P2` after P1 · `P3` later · none = unranked |
 | `claude` | anything Claude filed on its own initiative: bugs, ideas, problems spotted |
+| `batch` | an umbrella whose `## Members` lists the tickets one session delivers together (see Batching) |
 
 Run `pm-issue.sh labels` once per session start; it is idempotent and creates any that are missing.
 
@@ -93,13 +94,48 @@ How to get there:
 Status: `needs-info` while you are still asking; `ready` when the body is complete, the user
 has agreed it, and Open questions is empty. Only the user can say an issue is ready.
 
+## Batching
+
+**The unit of delivery is a batch, not a ticket** (user decision, 2026-09-07). One ticket per
+session cost 30–60 minutes of boot, review, validation and reporting each, surfaced a few new
+tickets every time, and the backlog was growing faster than it was being delivered. So:
+
+- Group open tickets that touch the **same surface** — a table, a page, a context, an edge
+  function, a workflow, a concern such as "everything on the push-trigger path" — into one
+  umbrella issue labelled `batch`, titled `Batch N — <theme>`, with `## Idea`, `## Members`
+  (an ordered list, `#n title` per line, first mention wins), `## Why together`,
+  `## Decisions` (answers that bind every member), `## Delivery` (the standard batch rule:
+  one task file, one commit per member, **one push**, one `check-dev`, one DEV validation, one
+  QA pass and one security review over the whole batch, one prod release), `## Security &
+  cost` and `## Depends on`. Members keep their own bodies; the umbrella never restates them.
+- Consolidation (one ticket absorbing another) is still the default for tickets that change
+  the same main function; batching is for tickets that are distinct but adjacent. A ticket
+  that is really a paragraph of another (a README line, a doc refresh, a decision to record)
+  is folded into the batch that touches that file rather than kept as a session of its own.
+- Keep a batch reviewable: one security surface and one tier. Something with a high blast
+  radius (a CSP header, a policy rewrite) is a batch of one. Decisions a member needs are
+  put to the user **when the batch is formed**, so the session does not stop for them.
+- `blocked` tickets join no batch and are not consolidated; they wait for the user.
+- A batch is `ready` when every member is `ready` and its decisions are recorded. Set the
+  members to `ready` too — `pm-run-issue.sh` leaves out a member that is closed or `blocked`
+  and warns, and refuses a batch with no eligible member.
+- After a batch session: each member carries its own outcome (`ready-for-prod` with a short
+  comment, or `needs-decision` / `blocked` with the question); the umbrella carries the full
+  report. On the prod release close the umbrella **and** every member that was released; a
+  member left at `needs-decision` stays open and is re-batched or run alone once answered.
+- Sessions filing many `claude` issues is part of what made delivery slow: the batch prompt
+  tells the session to file only genuine defects and risks and to fold trivial follow-ups
+  into the member they belong to. Triage what still arrives into an existing batch first.
+
 ## Prioritising
 
 The order is a **single numbered delivery sequence**, not priority buckets (user decision,
-2026-09-07): when work is assigned there is exactly one "next" ticket. It lives in the pinned
+2026-09-07): when work is assigned there is exactly one "next" item. It lives in the pinned
 issue **"Delivery order"** on the repo, whose body is the numbered list; the PM rewrites that
 body whenever the order changes, and `P1`/`P2`/`P3` are only a coarse summary derived from it
-(top third, middle, rest) for the list view.
+(top third, middle, rest) for the list view. Since batching, the items in the sequence are
+the batch umbrellas (with their members listed under each), plus any ticket deliberately run
+alone; a ticket that belongs to a batch is not sequenced separately.
 
 How to propose one:
 
@@ -116,9 +152,10 @@ How to propose one:
 - The user confirms or reorders; then write the pinned issue and apply the summary labels.
   Never move or close an issue the user did not ask about.
 
-## Picking the next feature and running it
+## Picking the next item and running it
 
-1. Choose: the first item in the pinned "Delivery order" issue that is open and `ready`
+1. Choose: the first item in the pinned "Delivery order" issue that is open and `ready` —
+   normally a batch umbrella; `pm-issue.sh members <n>` shows what it will deliver
    (fall back to lowest P, then oldest, if the pinned issue is missing). **A `blocked`
    ticket is never started, even when it is next in the order: skip it and take the next
    `ready` item in the sequence** (user decision, 2026-09-07). The same goes for
@@ -142,7 +179,8 @@ How to propose one:
    - **READY FOR PROD** — report it, then ask exactly **"Shall I deploy this to prod?"**. On an
      explicit yes, do the release yourself as the Orchestrator per `CLAUDE.md` (grant,
      dispatch in order, watch, validate read-only, revoke), comment "🚀 RELEASED TO PROD" with
-     run ids and evidence, and **close the issue**. Anything else: it stays `ready-for-prod`.
+     run ids and evidence, and **close the issue** — for a batch, the umbrella and every
+     member that was released. Anything else: it stays `ready-for-prod`.
    - **NEEDS-DECISION / BLOCKED** — put the session's questions to the user now. Record the
      answers as a comment and under `## Decisions`, set the status back to `ready`, and it
      goes to the top of the queue — a **new** session resumes it (the prompt tells the
