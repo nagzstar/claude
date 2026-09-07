@@ -4,6 +4,7 @@ Status: NOT STARTED | IN PROGRESS | IN REVIEW | BLOCKED | DONE
 Owner: Orchestrator
 Tier: 2 | 3 | 4   (models actually used are logged below)
 Base commit: <sha of NGM main when work started>
+Issue: #<n> (when started from the backlog; otherwise "none")
 Updated: <date>
 
 ## Goal
@@ -56,4 +57,4 @@ Durable ones are appended to `.agent-context/lessons.md` at COMPLETE.
 | Problem | Owner | Tier |
 |---|---|---|
 |  |  |  |
-Copied to the backlog in `.agent-context/lessons.md` at COMPLETE.
+Each row is filed as its own GitHub issue labelled `claude` at COMPLETE (`pm-issue.sh new`); put the issue numbers here.

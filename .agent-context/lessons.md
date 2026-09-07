@@ -51,6 +51,10 @@ the backlog of outcomes the user can pick from — each with an owner and a tier
 
 ## Problems spotted (backlog — not yet fixed)
 
+New problems are no longer appended here: at COMPLETE each one is filed as its own GitHub
+issue labelled `claude` (`bash .claude/scripts/pm-issue.sh new`). The rows below predate
+that; the Project Manager (`ngm-project-manager` skill) offers to migrate them.
+
 | Spotted | Problem | Owner | Tier |
 |---|---|---|---|
 | 2026-09-06 | `has_role(uid, role)` is callable by any authenticated user with an arbitrary uid, leaking "is user X an admin". Pre-existing, unrelated to signup. | backend-engineer + security-reviewer | 3 |

@@ -166,5 +166,24 @@ if [ -f evals/routing-cases.json ]; then
   ' && ok || bad "evals/routing-cases.json has problems (see above)"
 fi
 
+# ---- 6. project manager mode ---------------------------------------------------------------
+# The feature-session prompt is built offline (--print-prompt needs no gh, git or network).
+grep -q "ngm-project-manager" CLAUDE.md && ok || bad "CLAUDE.md does not point at the ngm-project-manager skill"
+grep -q "pm-issue.sh new" CLAUDE.md && ok || bad "CLAUDE.md COMPLETE step does not file problems as claude issues"
+p="$(bash .claude/scripts/pm-run-issue.sh 42 --print-prompt 2>/dev/null)"
+[ -n "$p" ] && ok || bad "pm-run-issue.sh --print-prompt produced nothing"
+printf "%s" "$p" | grep -q "#42" && ok || bad "pm-run-issue prompt does not name the issue"
+printf "%s" "$p" | grep -q "pm-issue.sh show 42" && ok || bad "pm-run-issue prompt does not make the session read the issue and its comments"
+printf "%s" "$p" | grep -q "status 42 in-progress" && ok || bad "pm-run-issue prompt does not set in-progress"
+printf "%s" "$p" | grep -q "ready-for-prod" && ok || bad "pm-run-issue prompt lacks the ready-for-prod status"
+printf "%s" "$p" | grep -q "Never dispatch environment=prod" && ok || bad "pm-run-issue prompt does not forbid a prod dispatch"
+printf "%s" "$p" | grep -q "Never close the issue" && ok || bad "pm-run-issue prompt does not forbid closing the issue"
+printf "%s" "$p" | grep -q "claude --resume" && ok || bad "pm-run-issue prompt does not give the resume command"
+printf "%s" "$p" | grep -qE "labelled .claude." && ok || bad "pm-run-issue prompt does not label filed problems claude"
+bash .claude/scripts/pm-run-issue.sh --help >/dev/null 2>&1 && ok || bad "pm-run-issue.sh --help failed"
+bash .claude/scripts/pm-run-issue.sh --print-prompt >/dev/null 2>&1 && bad "pm-run-issue accepted a missing issue number" || ok
+bash .claude/scripts/pm-issue.sh >/dev/null 2>&1; [ $? -eq 2 ] && ok || bad "pm-issue.sh without a command should exit 2"
+grep -q "in-progress|" .claude/scripts/pm-issue.sh && grep -q "^claude|" .claude/scripts/pm-issue.sh && ok || bad "pm-issue.sh label set lacks claude or in-progress"
+
 echo "validate: $pass passed, $fail failed"
 [ "$fail" -eq 0 ]

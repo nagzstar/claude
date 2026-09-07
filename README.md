@@ -25,6 +25,14 @@ asks **"Shall I deploy this to prod?"** — releasing to production only on your
 and otherwise asking you only when a decision is genuinely yours. You should not need to name agents or
 manage context. To constrain it, say so ("frontend only", "investigate, don't implement").
 
+For backlog work, say `/ngm-project-manager` (or "PM", "backlog", "pick up #12"). That mode
+fleshes tickets out with you on https://github.com/nagzstar/ngm.app/issues — asking whatever
+it needs, using `Explore` or `researcher-architect` for context — labels and prioritises them,
+then delivers each one in a **fresh headless session per issue** (`pm-run-issue.sh`) and writes
+the outcome back onto the issue: READY FOR PROD, the decisions it needs, or why it is blocked.
+Bugs and ideas found on the way become new issues labelled `claude`. The prod question is
+still asked in your conversation, every time.
+
 ## Architecture
 
 ```
@@ -37,7 +45,8 @@ User
      ├─ deployment-engineer (sonnet)     .github/workflows/
      ├─ qa-engineer (sonnet)             independent functional verification; test files only
      └─ security-reviewer (opus)         independent authorization / RLS / pipeline-safety review; read-only
-     scripts (no model): check-app.sh · check-dev.sh · context-drift.sh
+     scripts (no model): check-app.sh · check-dev.sh · context-drift.sh · pm-issue.sh · pm-run-issue.sh
+     PM mode (skill ngm-project-manager, your session): GitHub issues → one fresh session per feature
      hooks   (no model): guard-prod.sh (PROD boundary) · guard-paths.sh (file ownership)
 ```
 
@@ -95,8 +104,9 @@ CLAUDE.md                          Orchestrator contract (always in context)
 .claude/skills/ngm-standing-rules  Rules preloaded into every specialist (single source)
 .claude/skills/ngm-facts           Environment, cost and deployment-authority facts
 .claude/skills/ngm-feature-prompt  How to write a pasteable multi-phase feature prompt (prompts/)
+.claude/skills/ngm-project-manager Project Manager mode: flesh out, prioritise and run GitHub issues
 .claude/hooks/                     guard-prod.sh, guard-paths.sh
-.claude/scripts/                   check-app.sh, check-dev.sh, context-drift.sh, prod-approval.sh
+.claude/scripts/                   check-app, check-dev, context-drift, prod-approval, pm-issue, pm-run-issue
 .claude/settings.json              Permissions + the prod guard hook
 .agent-context/project.md          Architecture summary — read instead of re-exploring
 .agent-context/security-model.md   Roles, RLS, the dual-role-system hazard
@@ -104,7 +114,7 @@ CLAUDE.md                          Orchestrator contract (always in context)
 .agent-context/baseline.json       Accepted lint/test state of main (read by check-app.sh)
 .agent-context/handoff.md          Delegation, correction and task-file formats
 .agent-context/tasks/              Per-task shared state and resume point (tracked in both repos)
-.agent-context/lessons.md          Cumulative lessons learnt + backlog of problems spotted (tracked)
+.agent-context/lessons.md          Cumulative lessons learnt (tracked); problems spotted are GitHub issues
 prompts/                           Feature prompts the user pastes to start large, multi-phase work
 evals/                             Routing cases + runner (costs tokens); see evals/README.md
 scripts/validate.sh                Deterministic self-test (free) — also runs in CI

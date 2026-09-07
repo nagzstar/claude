@@ -46,10 +46,10 @@ Detail: skill `ngm-facts`. Pipelines: `.agent-context/delivery.md` (delivery wor
    file).
 3. **Resume check.** Look for `.agent-context/tasks/*.md` with `Status: IN PROGRESS | IN REVIEW
    | BLOCKED`, and run `git -C NGM_ROOT status --short`. Either means an interrupted session:
-   assess what is on disk against the task log before starting anything new; never discard
-   it silently.
-4. Do not glob or grep NGM broadly yourself; reading 3–4 named files to scope a task is fine.
-   To *locate* code use `Explore` (`model: haiku`); to *understand or design*, `researcher-architect`.
+   assess the disk against the task log before starting anything new; never discard it
+   silently.
+4. Do not glob or grep NGM broadly yourself (reading 3–4 named files to scope a task is
+   fine): `Explore` (`model: haiku`) locates code; `researcher-architect` understands or designs.
 
 ## Lifecycle — every non-trivial task
 
@@ -82,17 +82,17 @@ PLAN → DELEGATE → EXECUTE → VERIFY → REVIEW → INTEGRATE → COMPLETE
   pipeline itself is at fault), and repeat. Validate the behaviour on
   https://dev.nextgenmaher.com (via qa-engineer for anything non-trivial).
 - **COMPLETE.** Fill the task file's **Lessons Learnt** and **Problems Spotted** sections
-  (every problem with an owner and a tier), mark it DONE with test results and risks, and
-  **commit it** (task records are versioned in both repos: the audit trail). Append the
-  durable lessons and every out-of-scope problem to
-  `.agent-context/lessons.md`; prune anything there that a context file now covers. Update
-  `project.md` / `security-model.md` / `delivery.md` only if architecture genuinely changed.
-  Then report in the format below and ask **"Shall I deploy this to prod?"**.
+  (each problem with owner and tier), mark it DONE with test results and risks, and
+  **commit it** (task records are versioned in both repos: the audit trail). Append durable
+  lessons to `.agent-context/lessons.md`; file every out-of-scope problem, bug or idea as its
+  own GitHub issue labelled `claude` (`pm-issue.sh new`). Update `project.md` /
+  `security-model.md` / `delivery.md` only if architecture genuinely changed. Then report in
+  the format below and ask **"Shall I deploy this to prod?"**.
 
 ## Prod release — only after the user's yes
 
 1. `bash .claude/scripts/prod-approval.sh grant <sha> "<the user's words>"` — the hook checks
-   this; it expires in 60 minutes and never works inside a subagent.
+   it; expires in 60 minutes; never valid inside a subagent.
 2. Pre-flight: prod returns 200 and the prod Supabase project is awake. Dispatch only the
    workflows the change needs, one at a time, in order: `terraform-apply.yml` →
    `database-migration.yml` → `deploy.yml`, each with `-f environment=prod`; `gh run watch`
@@ -100,6 +100,15 @@ PLAN → DELEGATE → EXECUTE → VERIFY → REVIEW → INTEGRATE → COMPLETE
 3. Validate https://nextgenmaher.com read-only (bundle live, behaviour; create and delete
    nothing), `prod-approval.sh revoke`, record run ids and evidence in the task file, commit
    it, and report **RELEASED TO PROD**.
+
+## Backlog — Project Manager mode
+
+Backlog = GitHub Issues on `nagzstar/ngm.app`. The `ngm-project-manager` skill makes you
+the PM: flesh tickets out with the user, label and prioritise them, and deliver each one in
+a **fresh headless session** (`.claude/scripts/pm-run-issue.sh <n>`) — never inside the PM
+conversation, never two at once. It reads the issue and comments first, comments its
+outcome back, and can never release to prod. Working from an issue, the task file carries
+`Issue: #n` and commits reference it.
 
 ## Specialists and default models
 
@@ -122,26 +131,25 @@ in both handoffs. Two agents never edit the same file; `guard-paths` enforces it
 | Tier | Model | Use for |
 |---|---|---|
 | 1 | scripts / `Explore` on haiku | deterministic checks (`check-app`, `check-dev`, `context-drift`), locating code, bulk read-only extraction |
-| 2 | claude-sonnet-5 | routine implementation on an established pattern: a new page or component modelled on an existing one; a new table + RLS copying an existing policy shape; copy/UX changes; a step added to an existing workflow; functional QA; new tests |
+| 2 | claude-sonnet-5 | routine implementation on an established pattern: a page or component modelled on an existing one; a table + RLS copying an existing policy shape; copy/UX changes; a step added to an existing workflow; functional QA; new tests |
 | 3 | claude-opus-5 | design; security review; **any change to an existing RLS policy or security-definer function**; role mutation; edge-function auth paths; structural `AuthContext` change; pipeline trigger/ordering/gate/identity changes; anything cross-cutting three or more pages; orchestration of tier-3 work |
 | 4 | claude-fable-5-1 | replacing an architectural pattern (e.g. `AuthContext` → react-query, build-once/runtime config); **the mobile-app approach decision** (`project.md` roadmap); migrations rewriting policies across every table or backfilling live data; root-cause analysis with no reproduction; anything a tier-3 attempt failed |
 
 Rules:
 - Classify at PLAN; write the tier in the task file. Pass `model` on the `Agent` call to
   raise an agent above its default. Defaults are the floor for that agent's routine work.
-- Your session model is pinned per repo in `settings.json`: `claude-fable-5-1` in the
-  agent-system repo (changes there compound across every session), `claude-opus-5` in the
-  copy installed into `ngm.app`. For a tier-4 NGM task from `ngm.app`, ask the user for
-  `/model claude-fable-5-1` before PLAN, and pass `model: claude-fable-5-1` to
-  researcher-architect for the design step regardless.
-- Sonnet specialists run at `effort: medium`. If one returns thin work on a genuinely tier-2
-  task, re-run it with `model: claude-opus-5` rather than nudging the prompt.
+- Session model is pinned per repo in `settings.json`: Fable in the agent-system repo
+  (changes there compound across every session), Opus in the copy installed into `ngm.app`.
+  For a tier-4 NGM task from `ngm.app`, ask the user for `/model claude-fable-5-1` before
+  PLAN, and pass `model: claude-fable-5-1` to researcher-architect for the design regardless.
+- Sonnet specialists run at `effort: medium`; thin work on a genuine tier-2 task is re-run
+  with `model: claude-opus-5`, not with a nudged prompt.
 - **Escalate** (one tier) when an agent returns `BLOCKED`/`NEEDS-DECISION` because of
   complexity rather than a missing decision, when the same finding fails a second correction
   round, or when an agent's output contradicts the repo on inspection.
 - **Never downgrade** below the tier the trigger list gives — security review and RLS work
-  never run below Opus. Cost efficiency comes from not over-provisioning routine work, not
-  from under-provisioning risky work.
+  never run below Opus. Save cost by not over-provisioning routine work, never by
+  under-provisioning risky work.
 - Trivial (one file, obvious: typo, copy, style tweak, one-line fix): do it yourself, no
   agents, no task file — but still run `check-app.sh` before you push.
 
@@ -158,8 +166,8 @@ Rules:
 - New infrastructure → backend-engineer (what it is) then deployment-engineer (how it
   ships), in sequence, never parallel.
 
-Never invoke every agent. Never invoke researcher-architect when `project.md` already
-answers the question. Never parallelise a dependency.
+Never invoke every agent, never researcher-architect when `project.md` already answers,
+never parallelise a dependency.
 
 ## Quality gate (apply before INTEGRATE)
 
@@ -167,11 +175,11 @@ answers the question. Never parallelise a dependency.
 2. Existing patterns followed: `AuthContext` for data, shadcn primitives, the edge-function
    auth pattern, migrations by name-replacement of policies.
 3. Smallest reasonable change — reject unrequested refactors, drive-by formatting, mass lint
-   fixes, new dependencies without a stated reason.
+   fixes and dependencies without a stated reason.
 4. Authorization enforced server-side (RLS or edge function), matching the ratified rule.
-5. `check-app.sh` PASS — build, tests, and **no new lint problems** vs
-   `.agent-context/baseline.json` (lint does not pass on `main`; that is not a regression).
-   Update the baseline only with `--update-baseline` after the user agrees.
+5. `check-app.sh` PASS — build, tests, **no new lint problems** vs `.agent-context/baseline.json`
+   (lint already fails on `main`; not a regression). The baseline moves only via
+   `--update-baseline` after the user agrees.
 6. qa-engineer (and security-reviewer where required) returned PASS independently.
 7. Free-tier posture intact; no new cost.
 
@@ -188,7 +196,7 @@ End every task with this, and nothing longer. Summarise outcomes; never dump age
 ## Architecture     decisions worth remembering; tier and models used
 ## Remaining Issues anything unresolved
 ## Lessons Learnt   what a future task must know; what would be done differently
-## Problems Spotted defects, risks, debt or gaps noticed but left out of scope — owner + tier
+## Problems Spotted defects, risks, debt or gaps left out of scope — filed as `claude` issues (#n each)
 ## Approval         APPROVED / NOT APPROVED + why
 ## Prod             READY FOR PROD (+ release notes, risks) then "Shall I deploy this to prod?"
                     / RELEASED TO PROD (+ run ids, evidence) / NOT READY + why
@@ -197,9 +205,9 @@ End every task with this, and nothing longer. Summarise outcomes; never dump age
 ## Escalation to the user
 
 Ask only when the answer materially changes product behaviour, architecture, cost, security
-posture, irreversible data, or a major UX decision — or when a tier-4 escalation is needed and
-the work is large. Do not ask about naming, file placement, or which shadcn component to
-use. Group questions; do not stop repeatedly. The prod question is the standing exception.
+posture, irreversible data or a major UX decision, or when a large tier-4 escalation is
+needed. Never ask about naming, file placement or which shadcn component to use. Group
+questions; do not stop repeatedly. The prod question is the standing exception.
 
 ## Standing rules
 
@@ -209,9 +217,8 @@ use. Group questions; do not stop repeatedly. The prod question is the standing 
 - Infrastructure and application delivery are separate pipelines driven by path filters; never
   merge them; never add a fourth environment. An app-only change runs the app pipeline only.
 - Never print secrets or `.env` contents. Never force-push.
-- Update `project.md` only when architecture genuinely changed. Keep it short.
 
-## Routing dry-run (used by `evals/`)
+## Routing dry-run (`evals/`)
 
 If a request begins with `ROUTE ONLY:`, do not execute. Output a single JSON object and stop:
 `{"tier": 1-4, "agents": [names in order], "parallel": bool, "models": {agent: model},
