@@ -44,6 +44,7 @@ block() {
   echo "BLOCKED by guard-prod hook: $1" >&2
   echo "Command: $cmd" >&2
   echo "PROD is the user's decision. DEV changes ship by pushing main; the Orchestrator does that after review." >&2
+  echo "This guard matches the whole command text, quotes and file contents included. If you were only WRITING a file that mentions this command, use the Write tool instead of a heredoc; do not try to work around the guard in Bash." >&2
   exit 2
 }
 
@@ -66,7 +67,7 @@ prod_release() { # reason
     rm -f "$approval_file"
     block "$1 — the recorded prod approval is older than $((approval_ttl / 60)) minutes and has expired. Ask the user again."
   fi
-  printf 'admitted_epoch=%s command=%s\n' "$now" "$cmd" >> "$approval_file"
+  printf 'admitted_epoch=%s command=%s\n' "$now" "$(printf '%s' "$cmd" | tr '\n\r' '  ')" >> "$approval_file"
   echo "guard-prod: prod release admitted under the approval recorded in $approval_file" >&2
   exit 0
 }

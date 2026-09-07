@@ -51,7 +51,7 @@ Anything unresolved, unverified, or deferred — including what the user must kn
 
 ## Lessons Learnt
 What would be done differently, what surprised the team, what a future task must know.
-Durable ones are appended to `.agent-context/lessons.md` at COMPLETE.
+Durable ones are appended to `NGM_ROOT/.agent-context/lessons.md` at COMPLETE.
 
 ## Problems Spotted (out of scope for this task)
 | Problem | Owner | Tier |

@@ -31,7 +31,7 @@ files are likewise overwritten from source. Confirmed by reading lines 20–43 o
 install: all three SKILL.md files, and the `skills:` frontmatter added to `backend-engineer`
 and `frontend-engineer`. Two things survive — `.claude/skills/RETROSPECTIVE.md`, because the
 stale-removal loop only iterates directories and this is a loose file, and
-`.agent-context/lessons.md`, which the installer explicitly seeds only and never overwrites.
+`NGM_ROOT/.agent-context/lessons.md`, which lives in ngm.app and is never installed.
 **Rule:** durable agent-system changes belong in `C:\Users\nagaj\git\claude`, not in the
 deployed copy. Anything written into `ngm.app/.claude/` is a working copy with a lifetime of
 "until the next install".

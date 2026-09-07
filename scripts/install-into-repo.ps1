@@ -42,14 +42,11 @@ Get-ChildItem -Path "$Target\.claude\skills" -Directory | Where-Object {
   -not (Test-Path (Join-Path "$Source\.claude\skills" $_.Name))
 } | ForEach-Object { Write-Host "  removing stale skill $($_.FullName)"; Remove-Item $_.FullName -Recurse -Force }
 
-# Additive: context files, baseline, templates. Task records are never removed, and
-# lessons.md is only seeded (it is a tracked project record in the target, never overwritten).
+# Additive: context files, baseline, templates. Task records are never removed. lessons.md is
+# NOT installed at all: ngm.app owns and tracks it (decision 2026-09-07, ngm.app#28).
 New-Item -ItemType Directory -Force -Path "$Target\.agent-context\tasks" | Out-Null
 Get-ChildItem "$Source\.agent-context" -File -Filter '*.md' | Where-Object { $_.Name -ne 'lessons.md' } | ForEach-Object {
   Copy-Item $_.FullName "$Target\.agent-context\" -Force
-}
-if (-not (Test-Path "$Target\.agent-context\lessons.md")) {
-  Copy-Item "$Source\.agent-context\lessons.md" "$Target\.agent-context\"
 }
 Copy-Item "$Source\.agent-context\*.json" "$Target\.agent-context\" -Force
 Copy-Item "$Source\.agent-context\tasks\TEMPLATE.md" "$Target\.agent-context\tasks\" -Force
@@ -89,7 +86,7 @@ Write-Host "  .claude/skills/         $((Get-ChildItem "$Source\.claude\skills" 
 Write-Host "  .claude/hooks/          guard-prod, guard-paths (synced)"
 Write-Host "  .claude/scripts/        check-app, check-dev, context-drift, prod-approval, pm-issue, pm-run-issue (synced)"
 Write-Host "  .claude/settings.json   permissions + hooks (additionalDirectories stripped; model pinned to claude-opus-5)"
-Write-Host "  .agent-context/         project, security-model, delivery, handoff, baseline, tasks (additive; lessons.md seeded only)"
+Write-Host "  .agent-context/         project, security-model, delivery, handoff, baseline, tasks (additive; lessons.md is owned by ngm.app, not installed)"
 Write-Host "  CLAUDE.md               orchestrator contract"
 Write-Host ""
 Write-Host "Start a new console in $Target and give it an outcome."

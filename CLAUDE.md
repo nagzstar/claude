@@ -38,7 +38,7 @@ Detail: skill `ngm-facts`. Pipelines: `.agent-context/delivery.md` (delivery wor
 
 ## Boot and resume (before delegating anything)
 
-1. Read `.agent-context/project.md` and `.agent-context/lessons.md` — always. Read
+1. Read `.agent-context/project.md` and `NGM_ROOT/.agent-context/lessons.md` — always. Read
    `security-model.md` only if the task touches auth, roles, permissions, user data or admin
    features; `delivery.md` only for CI/CD, deployment, environment or release work.
 2. Run `bash .claude/scripts/context-drift.sh`. If a context file's sources changed since it
@@ -46,10 +46,8 @@ Detail: skill `ngm-facts`. Pipelines: `.agent-context/delivery.md` (delivery wor
    file).
 3. **Resume check.** Look for `.agent-context/tasks/*.md` with `Status: IN PROGRESS | IN REVIEW
    | BLOCKED`, and run `git -C NGM_ROOT status --short`. Either means an interrupted session:
-   assess the disk against the task log before starting anything new; never discard it
-   silently.
-4. Do not glob or grep NGM broadly yourself (reading 3–4 named files to scope a task is
-   fine): `Explore` (`model: haiku`) locates code; `researcher-architect` understands or designs.
+   assess the disk against the task log before anything new; never discard it silently.
+4. Do not glob or grep NGM broadly yourself (three or four named files is fine): `Explore` (`model: haiku`) locates code; `researcher-architect` understands or designs.
 
 ## Lifecycle — every non-trivial task
 
@@ -78,13 +76,12 @@ PLAN → DELEGATE → EXECUTE → VERIFY → REVIEW → INTEGRATE → COMPLETE
   (Sonnet → Opus → Fable) or return to the user with the specific blocker.
 - **INTEGRATE.** You commit and push: one commit per task on `main` with a clear message,
   after review passes. Then `bash .claude/scripts/check-dev.sh --sha <sha>`; on failure read
-  `gh run view <id> --log-failed`, route the fix to the owner (deployment-engineer only if the
-  pipeline itself is at fault), and repeat. Validate the behaviour on
+  `gh run view <id> --log-failed`, route the fix to the owner (deployment-engineer only for pipeline faults), and repeat. Validate the behaviour on
   https://dev.nextgenmaher.com (via qa-engineer for anything non-trivial).
 - **COMPLETE.** Fill the task file's **Lessons Learnt** and **Problems Spotted** sections
   (each problem with owner and tier), mark it DONE with test results and risks, and
   **commit it** (task records are versioned in both repos: the audit trail). Append durable
-  lessons to `.agent-context/lessons.md`; file every out-of-scope problem, bug or idea as its
+  lessons to ngm.app's `lessons.md`; file every out-of-scope problem, bug or idea as its
   own GitHub issue labelled `claude` (`pm-issue.sh new`). Update `project.md` /
   `security-model.md` / `delivery.md` only if architecture genuinely changed. Then report in
   the format below and ask **"Shall I deploy this to prod?"**.

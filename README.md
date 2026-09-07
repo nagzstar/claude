@@ -114,7 +114,7 @@ CLAUDE.md                          Orchestrator contract (always in context)
 .agent-context/baseline.json       Accepted lint/test state of main (read by check-app.sh)
 .agent-context/handoff.md          Delegation, correction and task-file formats
 .agent-context/tasks/              Per-task shared state and resume point (tracked in both repos)
-.agent-context/lessons.md          Cumulative lessons learnt (tracked); problems spotted are GitHub issues
+(ngm.app) .agent-context/lessons.md   Cumulative lessons learnt — owned and tracked by ngm.app, not here; problems spotted are GitHub issues
 prompts/                           Feature prompts the user pastes to start large, multi-phase work
 evals/                             Routing cases + runner (costs tokens); see evals/README.md
 scripts/validate.sh                Deterministic self-test (free) — also runs in CI
