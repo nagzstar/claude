@@ -89,7 +89,11 @@ because GitHub does not enforce it. GitHub Pro would enable branch protection an
 reviewers but is a **paid plan and therefore ruled out**.
 
 **Tooling:** `bash .claude/scripts/check-dev.sh [--sha <sha>]` reports the runs for a commit
-and the dev HTTP status; `gh run view <id> --log-failed` for diagnosis.
+and the dev HTTP status; `gh run view <id> --log-failed` for diagnosis. `--sha` takes any git
+revision (a short sha is resolved to the full one it needs). With `--sha`, finding **no runs
+is a FAIL** — absence of evidence is not evidence of success — as is a run still in progress
+when the wait expires. Add `--allow-no-runs` only for a commit that genuinely matches no path
+filter (a docs- or task-file-only commit), and say so in the task file.
 
 ## Cost constraint — free or as close to free as possible
 

@@ -49,7 +49,8 @@ Pre-existing lint problems are not findings for this task; a mass lint fix is a 
 
 ## DEV validation (when the Orchestrator has pushed)
 
-Run `bash "$CLAUDE_PROJECT_DIR/.claude/scripts/check-dev.sh" --sha <sha>`. Confirm the runs
+Run `bash "$CLAUDE_PROJECT_DIR/.claude/scripts/check-dev.sh" --sha <sha>` (a short sha is
+resolved for you; no runs found is a FAIL, never a pass). Confirm the runs
 succeeded and then confirm the behaviour is live at https://dev.nextgenmaher.com — fetch the
 relevant route, check the deployed bundle contains the change, and exercise what you can
 without credentials. Never use https://nextgenmaher.com as evidence and never trigger any

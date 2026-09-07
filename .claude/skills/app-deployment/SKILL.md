@@ -64,7 +64,9 @@ count from this file.** `check-app.sh` reads the live baseline; trust it, not pr
 ## Verification
 
 - `bash "$CLAUDE_PROJECT_DIR/.claude/scripts/check-dev.sh" --sha <sha>` — waits for the
-  commit's runs and confirms dev returns 200.
+  commit's runs and confirms dev returns 200. A short sha is fine (it is resolved first).
+  **No runs found, or a run still running, is a FAIL** — only `--allow-no-runs` accepts an
+  empty result, and an app change under `app/**` must never need it.
 - **Confirm your code is actually in the deployed bundle**, not merely that a green run
   happened. Fetch the deployed JS and grep it for a string your change introduced:
   `curl -s https://dev.nextgenmaher.com/assets/index-<hash>.js | grep -c "<your string>"`.

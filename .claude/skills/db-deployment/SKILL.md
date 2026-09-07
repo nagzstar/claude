@@ -77,7 +77,10 @@ still runs it.
 ## Verification
 
 - `bash "$CLAUDE_PROJECT_DIR/.claude/scripts/check-dev.sh" --sha <sha>` — waits for that
-  commit's runs to finish and checks dev returns 200. Paste its summary line.
+  commit's runs to finish and checks dev returns 200. Paste its summary line. A short sha is
+  fine (it is resolved first), and **no runs found is a FAIL**: a commit touching
+  `supabase/migrations/**` must produce a Database Migration run, so an empty result means the
+  migration never ran, not that it passed.
 - Confirm the migration actually applied rather than assuming a green run means the right
   thing happened: `gh run view <id> --log | grep -i "Applying migration"`.
 - **Prove the gate empirically, not by reading SQL.** Sign in as a real low-privilege account
