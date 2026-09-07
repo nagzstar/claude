@@ -61,6 +61,23 @@ session exists for exactly one issue and ends when that issue is at READY FOR PR
 or NEEDS-DECISION. Never start another issue in this session. Nobody is reading this
 conversation live: every question for the user goes into an issue comment, not the chat.
 
+YOUR TURN ENDING IS THE SESSION ENDING. This is a single-shot \`claude -p\` run. Nothing
+re-invokes you: the moment you stop producing tool calls, the process exits and every piece
+of unfinished work is lost. Therefore:
+- NEVER pass \`run_in_background: true\` to the Agent tool. Every specialist you delegate to
+  runs in the FOREGROUND, and you wait for its result inside your own turn.
+- NEVER launch background Bash (\`run_in_background\`, \`nohup\`, trailing \`&\`) for anything
+  whose output you need.
+- NEVER end a turn "waiting" for something — a design pass, a review, a pipeline, a rate-limit
+  reset. There is no later. Poll it in the foreground instead (\`gh run watch\` for pipelines).
+- Keep working, in one continuous turn, until the issue reaches READY FOR PROD, BLOCKED or
+  NEEDS-DECISION and you have set the status label and posted the comment.
+If you genuinely cannot finish — you are out of context, or blocked on something only the user
+can resolve — do NOT just stop. Set the status to BLOCKED or NEEDS-DECISION, post the comment
+with what is done so far and the resume command, and say so in your final message. A session
+that stops with the issue still labelled \`in-progress\` has failed, and the launcher reports it
+as a failure.
+
 Issue: #${issue} in ${REPO} — https://github.com/${REPO}/issues/${issue}
 Session id: ${session_id}   (the user can resume you with: claude --resume ${session_id})
 
@@ -200,6 +217,25 @@ cd "$NGM_ROOT" || die "cannot cd to $NGM_ROOT"
   });
 ' "$base.log" "$base.json"
 rc=$?
+
+# A zero exit means the process ended cleanly, NOT that the issue was delivered: a session that
+# ends its turn while "waiting" for a background agent exits 0 having done nothing. The issue's
+# status label is the real outcome — the session must move it off in-progress before finishing.
+final_labels="$(gh issue view "$issue" -R "$REPO" --json labels --jq '[.labels[].name]|join(",")' 2>/dev/null || echo "")"
+case ",${final_labels}," in
+  *,ready-for-prod,*|*,needs-decision,*|*,blocked,*) ;;
+  *)
+    echo
+    echo "!!! pm-run-issue: issue #$issue is still labelled '${final_labels:-unknown}' — it did NOT reach"
+    echo "    ready-for-prod, needs-decision or blocked. The session stopped early and the work is"
+    echo "    almost certainly incomplete, whatever its final message said. Check the disk and git log"
+    echo "    before believing any claim of delivery:"
+    echo "      git -C \"$NGM_ROOT\" status --short && git -C \"$NGM_ROOT\" log --oneline -3"
+    echo "    Re-run this issue, or resume the session, rather than moving on."
+    rc=1
+    ;;
+esac
+
 echo
 echo "resume this session interactively (from $NGM_ROOT): claude --resume $session_id"
 exit $rc
