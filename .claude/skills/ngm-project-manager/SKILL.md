@@ -73,6 +73,16 @@ How to get there:
   cannot be written without a design fact (e.g. "can RLS express this at all?") — designs
   belong to the feature session, not the ticket. Say **what**, never **how**; a ticket that
   dictates the implementation will be wrong as soon as the design starts.
+- **Consolidate, do not chain.** Before the interview, scan the backlog for tickets that
+  change the same main function or surface (two profile tickets, an events list and an
+  event-content page, two resources ideas). Merge them into one ticket that carries the
+  whole scope: the survivor gets a `## Consolidated from #n` section holding the other's
+  `## Idea` verbatim, the other gets a "Duplicate of #n" comment and is closed. Do not ask
+  "one ticket or two?" — consolidating is the default (user decision, 2026-09-07); ask only
+  which survives when it is not obvious. Where two tickets state the same fact differently,
+  carry one version forward under `## Decisions` or ask the user which is the source of
+  truth. Each item is delivered by a fresh session, so two tickets on one function mean two
+  sessions re-learning the same code and contradicting each other.
 - **Size and risk, not tiers.** Note whether it is small / medium / large and whether it
   touches auth or money. The Orchestrator classifies the tier; you choose the launch model
   (`--model claude-fable-5-1` only for tier-4 shaped work: replacing an architectural
