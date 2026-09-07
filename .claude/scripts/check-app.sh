@@ -3,11 +3,16 @@
 #
 #   bash .claude/scripts/check-app.sh [--skip-build] [--update-baseline]
 #
-# Runs, from NGM_ROOT/app:  npm run build → npm run test → npm run lint
+# Runs, from NGM_ROOT/app:  npm run typecheck → npm run build → npm run test → npm run lint
 # and compares lint problem counts and the test count against .agent-context/baseline.json.
 # Lint does NOT pass cleanly on main, so the gate is "no NEW lint problems", never "lint clean".
 #
-# Exit 0  = PASS (build ok, tests ok, no new lint problems, no fewer tests than baseline)
+# Typecheck has NO baseline and never will: the correct number of TypeScript errors is zero,
+# permanently. A tolerated-count baseline would recreate the weakness this stage exists to fix
+# (ngm.app#43 — `build` was `vite build`, which strips types without checking them, so the gate
+# reported build=PASS for "esbuild emitted a bundle").
+#
+# Exit 0  = PASS (types sound, build ok, tests ok, no new lint problems, no fewer tests than baseline)
 # Exit 1  = FAIL (details printed)
 # --update-baseline rewrites baseline.json from this run. Orchestrator only, after the user
 # has agreed the new numbers are the accepted state of main.
@@ -45,6 +50,18 @@ read_baseline() { node -e '
 read -r b_err b_warn b_tests <<<"$(read_baseline)"
 
 fail=0
+# ---- typecheck ----------------------------------------------------------------------------
+# `npm run build` also runs `tsc -b` (so CI catches type errors too), but it runs here as its
+# own stage because a type error and a bundling failure are different problems and must not
+# share one build=FAIL. tsc -b is incremental, so the second run inside build costs almost
+# nothing. A missing typecheck script is itself a FAIL: the gate must never silently stop
+# checking types.
+if grep -q '"typecheck"[[:space:]]*:' package.json; then
+  if npm run typecheck >"$tmp/typecheck.log" 2>&1; then typecheck="PASS"; else typecheck="FAIL"; fail=1; fi
+else
+  typecheck="ABSENT"; fail=1
+fi
+
 # ---- build --------------------------------------------------------------------------------
 if [ "$skip_build" -eq 1 ]; then
   build="SKIPPED"
@@ -78,15 +95,17 @@ else
 fi
 
 # ---- summary ------------------------------------------------------------------------------
-echo "CHECK-APP  build=$build  test=$test_status tests=$tests(baseline $b_tests)  lint=${errs}e/${warns}w (baseline ${b_err}e/${b_warn}w) $lint"
+echo "CHECK-APP  typecheck=$typecheck  build=$build  test=$test_status tests=$tests(baseline $b_tests)  lint=${errs}e/${warns}w (baseline ${b_err}e/${b_warn}w) $lint"
 if [ "$fail" -eq 1 ]; then
   echo "--- failing output (tail) ---"
+  [ "$typecheck" = "FAIL" ] && { echo "[typecheck — every one of these must be fixed; there is no baseline]"; tail -40 "$tmp/typecheck.log"; }
+  [ "$typecheck" = "ABSENT" ] && echo "[typecheck] app/package.json has no typecheck script — the gate cannot verify types (see ngm.app#43)"
   [ "$build" = "FAIL" ] && { echo "[build]"; tail -40 "$tmp/build.log"; }
   case "$test_status" in FAIL*) echo "[test]"; sed -e 's/\x1b\[[0-9;]*m//g' "$tmp/test.log" | tail -40 ;; esac
   case "$lint" in FAIL*) echo "[lint — compare against baseline to find the NEW ones]"; sed -e 's/\x1b\[[0-9;]*m//g' "$tmp/lint.log" | grep -E '^\s+[0-9]+:[0-9]+' | tail -60 ;; esac
 fi
 
-if [ "$update" -eq 1 ] && [ "$build" != "FAIL" ]; then
+if [ "$update" -eq 1 ] && [ "$build" != "FAIL" ] && [ "$typecheck" = "PASS" ]; then
   node -e '
     const fs = require("fs"); const p = process.argv[1];
     const b = JSON.parse(fs.readFileSync(p, "utf8"));

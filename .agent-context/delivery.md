@@ -124,45 +124,50 @@ filter (a docs- or task-file-only commit), and say so in the task file.
    by the Orchestrator before pushing) is the pre-push equivalent. A PR-triggered job is only
    worth its minutes if the user ever adopts a PR workflow.
 
-3. **Do NOT add `npm run lint` as a blocking step** without first clearing the baseline.
+3. **`npm run build` typechecks as of 2026-09-07** (`tsc -b && vite build`, ngm.app#43), so the
+   Deploy workflow now fails on a TypeScript error instead of shipping a bundle esbuild produced
+   by stripping the types unchecked. `check-app.sh` reports it as its own `typecheck=` stage.
+   There is no baseline for it and there must never be one: zero is the only acceptable count.
+
+4. **Do NOT add `npm run lint` as a blocking step** without first clearing the baseline.
    Lint fails on untouched `main` (see `.agent-context/baseline.json`). Adding it as a gate
    would red-build every run. Either fix the baseline first as its own task, or add it
    non-blocking.
 
-4. **Migration and app deploy ordering is unmanaged.** They are independent workflows with
+5. **Migration and app deploy ordering is unmanaged.** They are independent workflows with
    disjoint path filters. A single push touching both `app/**` and `supabase/migrations/**`
    starts both **concurrently**, with no guarantee migrations land first. Backwards-compatible,
    additive migrations are what currently makes this safe. For any breaking schema change,
    sequencing must be handled deliberately — expand/contract, or an explicit ordered run.
 
-5. **No dependency or IaC security scanning** — no `npm audit`, no tfsec/checkov/trivy, no
+6. **No dependency or IaC security scanning** — no `npm audit`, no tfsec/checkov/trivy, no
    Dependabot config. All free; each costs minutes only when it runs, so scope triggers narrowly.
 
-6. **No post-deploy verification** — nothing confirms a release beyond the deploy step exiting
+7. **No post-deploy verification** — nothing confirms a release beyond the deploy step exiting
    0. A `curl -f` of the site after `pages deploy` is a free, seconds-long smoke check.
 
-7. **No documented rollback.** Cloudflare Pages retains previous deployments, so app rollback
+8. **No documented rollback.** Cloudflare Pages retains previous deployments, so app rollback
    is redeploying a prior deployment. **Migrations are forward-only with no down migrations** —
    database rollback means writing a corrective migration. Treat every migration as
    irreversible when assessing risk.
 
-8. **`cancel-in-progress: true` on `deploy.yml`** can cancel an in-flight production deploy if
+9. **`cancel-in-progress: true` on `deploy.yml`** can cancel an in-flight production deploy if
    another prod run starts. `database-migration.yml` and `terraform-apply.yml` correctly use `false`.
 
-9. **Long-lived secrets, no OIDC.** `CLOUDFLARE_API_TOKEN`, `SUPABASE_ACCESS_TOKEN`,
+10. **Long-lived secrets, no OIDC.** `CLOUDFLARE_API_TOKEN`, `SUPABASE_ACCESS_TOKEN`,
    `SUPABASE_DB_PASSWORD`, `TF_API_TOKEN`. Cloudflare and Supabase do not offer GitHub-OIDC
    federation, so this is a constraint rather than a defect. Rotation and least-privilege
    token scoping are the realistic controls.
 
-10. **No branch protection, and none is wanted.** Work directly on `main`. Never write a
+11. **No branch protection, and none is wanted.** Work directly on `main`. Never write a
     pipeline that assumes a PR gate exists.
 
-11. **Actions are pinned to major tags, not commit SHAs** (`actions/checkout@v4`,
+12. **Actions are pinned to major tags, not commit SHAs** (`actions/checkout@v4`,
     `supabase/setup-cli@v1`, `cloudflare/wrangler-action@v3`, …), and `supabase/setup-cli`
     uses `version: latest`, so a migration run is not reproducible and a compromised tag
     would flow straight into deploys. SHA-pinning plus a fixed Supabase CLI version is free.
 
-12. **Edge functions are deployed with `verify_jwt = false`** (`supabase/config.toml`) and
+13. **Edge functions are deployed with `verify_jwt = false`** (`supabase/config.toml`) and
     verify the Bearer token in code instead. That is the established pattern and works, but
     every new function must replicate the in-code check — the platform will not do it.
 

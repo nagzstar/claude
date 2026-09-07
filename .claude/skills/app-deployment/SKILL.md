@@ -36,14 +36,25 @@ count from this file.** `check-app.sh` reads the live baseline; trust it, not pr
 
 3. **Run the gate before reporting.**
    `bash "$CLAUDE_PROJECT_DIR/.claude/scripts/check-app.sh"`
-   It runs build → test → lint from `app/` and compares the results against
+   It runs typecheck → build → test → lint from `app/` and compares the results against
    `.agent-context/baseline.json`. **Paste its summary line into your report.** Do not
-   re-implement it, and do not run the three commands by hand to argue with its verdict.
+   re-implement it, and do not run the four commands by hand to argue with its verdict.
    - `--skip-build` is available for a fast loop, but never for the final report.
    - `--update-baseline` is **Orchestrator-only, and only after the user has agreed** the new
      numbers are the accepted state of `main`.
 
-4. **The lint bar is "no NEW problems", never "lint is clean."** Lint does not pass on
+4. **The typecheck bar is zero, always.** `typecheck=` runs `npm run typecheck` (`tsc -b`) and
+   has **no baseline and never will** — unlike lint, the correct number of TypeScript errors is
+   zero, permanently, and a tolerated count would recreate the very weakness this stage exists
+   to fix (ngm.app#43: `build` was `vite build`, which strips types without checking them, so
+   the gate reported `build=PASS` for "esbuild emitted a bundle"). `npm run build` is now
+   `tsc -b && vite build`, so **CI fails on a type error too**, not just the local gate. Fix
+   every error properly: `any`, `as unknown as`, `@ts-ignore` and a fresh `@ts-expect-error` all
+   defeat the point. This is the check that catches
+   `app/src/integrations/supabase/types.ts` drifting from the migrations, so a type error at a
+   `.update({...})` or `.from(...)` call site is a signal about the database, not a nuisance.
+
+5. **The lint bar is "no NEW problems", never "lint is clean."** Lint does not pass on
    untouched `main`. `@typescript-eslint/no-explicit-any` is an *error* rule, so introducing
    `any` fails the gate. Never mass-fix the pre-existing problems as a drive-by — that makes
    the diff unreviewable and is its own task.
