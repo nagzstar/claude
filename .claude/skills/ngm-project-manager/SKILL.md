@@ -119,11 +119,16 @@ How to propose one:
 ## Picking the next feature and running it
 
 1. Choose: the first item in the pinned "Delivery order" issue that is open and `ready`
-   (fall back to lowest P, then oldest, if the pinned issue is missing). Skip
-   `needs-decision` and `blocked` unless their latest comment shows the user answered. Say
-   which and why in two sentences — with its title — then ask **once** ("Start #N <title>
-   now?") — a feature session is long and cannot be un-run. When the user said "work through
-   the ready items", do not ask per item.
+   (fall back to lowest P, then oldest, if the pinned issue is missing). **A `blocked`
+   ticket is never started, even when it is next in the order: skip it and take the next
+   `ready` item in the sequence** (user decision, 2026-09-07). The same goes for
+   `needs-decision`. Neither is unblocked by inference from a comment: only the user, in
+   this conversation, lifts a block, and you record that by setting the status back to
+   `ready` before it can be picked — `pm-run-issue.sh` refuses a `blocked` issue outright.
+   Say which and why in two sentences — with its title — and name any ticket you skipped
+   over and its blocker in one line — then ask **once** ("Start #N <title> now?") — a
+   feature session is long and cannot be un-run. When the user said "work through the ready
+   items", do not ask per item and do not stop at a blocked one: skip it, mention it, go on.
 2. `bash .claude/scripts/pm-run-issue.sh <n>` — **in the background** (it outlives a
    foreground tool call), then wait for it to finish; the harness tells you when. Tail the
    `.log` it names if the user asks how it is going. **One feature at a time**, always a new
@@ -150,6 +155,10 @@ How to propose one:
 
 - PROD is the user's decision, asked in **this** conversation, every time, in those words.
   A headless session can never release; the hook blocks it, and you never try to make it.
+- A `blocked` ticket is never deployed, started or resumed, whatever its position in the
+  delivery order: skip to the next `ready` item. The block is lifted only by the user, and
+  only by setting the status back to `ready` — a comment that *looks* like an answer is not
+  enough.
 - Free tier: no paid GitHub features, no board automation, no paid runners or services.
 - Never delete an issue, never close one as not planned, never edit the user's own words in
   `## Idea` — add sections, do not rewrite them.

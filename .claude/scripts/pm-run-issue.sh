@@ -12,6 +12,9 @@
 #     --dry-run                 run the pre-flight checks and print the command; do not launch
 #     --print-prompt            print the prompt the session would get and exit (no gh, no git)
 #
+# Refuses a closed issue and any issue labelled `blocked` (no override: the PM lifts the block
+# by setting the status back to `ready` on the user's say-so).
+#
 # The session takes as long as the feature takes (typically 20–90 minutes). Run it in the
 # background and tail the .log file it names. It can never reach prod: the guard-prod hook
 # admits a prod dispatch only under a recorded approval, which is granted only in a live
@@ -112,6 +115,12 @@ fi
 [ -d "$NGM_ROOT/.git" ] || die "NGM_ROOT is not a git checkout: $NGM_ROOT"
 gh auth status >/dev/null 2>&1 || die "gh is not authenticated"
 gh issue view "$issue" -R "$REPO" --json state --jq .state | grep -qx OPEN || die "issue #$issue is not an open issue in $REPO"
+# A blocked ticket is never started, whatever its place in the delivery order (user decision,
+# 2026-09-07). The PM lifts the block by setting the status back to `ready`; no override here.
+if gh issue view "$issue" -R "$REPO" --json labels --jq '.labels[].name' | grep -qx blocked; then
+  die "issue #$issue is labelled 'blocked' — skip to the next ready item in the delivery order;
+  only the user can lift the block (pm-issue.sh status $issue ready after their say-so)"
+fi
 
 lock="$NGM_ROOT/.agent-context/.pm-run.lock"
 if [ -f "$lock" ]; then
