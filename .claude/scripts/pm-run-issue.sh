@@ -371,10 +371,20 @@ esac
 # (restorable), so main is clean for the next run and nothing is rescued by hand again
 # (#12, #55 and #70 were, on 2026-09-07).
 if [ -n "$(git -C "$NGM_ROOT" status --short)" ]; then
-  git -C "$NGM_ROOT" add -A -N . 2>/dev/null
-  git -C "$NGM_ROOT" diff > "$base.partial.diff"
+  # Capture the diff WITHOUT `add -N` first. `git add -A -N` creates intent-to-add entries, and
+  # `git stash push` then fails with "Entry '<path>' not uptodate. Cannot merge." — the safety net
+  # silently preserves nothing. That is exactly what happened to #74's task file on 2026-09-08.
+  # `--binary` so the diff can actually be applied; untracked files are listed separately because
+  # a plain `git diff` never shows them.
+  git -C "$NGM_ROOT" diff --binary HEAD > "$base.partial.diff" 2>/dev/null
+  git -C "$NGM_ROOT" ls-files --others --exclude-standard > "$base.partial.untracked.txt" 2>/dev/null
   if git -C "$NGM_ROOT" stash push -u -q -m "pm-run-issue draft #$issue $ts ($outcome)"; then
     echo "pm-run-issue: uncommitted work preserved in $base.partial.diff and stash 'pm-run-issue draft #$issue $ts' — restore with: git -C \"$NGM_ROOT\" stash pop"
+  else
+    # Never claim preservation that did not happen — the diff file is then the only copy.
+    echo "pm-run-issue: WARNING — 'git stash push' FAILED; the tree is still dirty and the next run" >&2
+    echo "  will refuse to start. The only capture is $base.partial.diff (apply with 'git apply')." >&2
+    echo "  Untracked files at that moment: $base.partial.untracked.txt" >&2
   fi
 fi
 

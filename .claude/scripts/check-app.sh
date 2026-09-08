@@ -107,7 +107,16 @@ if [ -f "$lessons_file" ]; then
 fi
 
 # ---- summary ------------------------------------------------------------------------------
-echo "CHECK-APP  typecheck=$typecheck  build=$build  test=$test_status tests=$tests(baseline $b_tests)  lint=${errs}e/${warns}w (baseline ${b_err}e/${b_warn}w) $lint  lessons=$lessons_gate"
+# The verdict goes FIRST and LAST. It used to appear only as this line's exit code, while the
+# lint clause's own "PASS (no new problems)" sat at the end and read like an overall verdict —
+# ngm.app #69 nearly committed through a test=FAIL for exactly that reason. Every clause is now
+# labelled with its own scope, and CHECK-APP PASS/FAIL brackets the line.
+[ "$fail" -eq 1 ] && verdict="FAIL" || verdict="PASS"
+echo "CHECK-APP $verdict  typecheck=$typecheck  build=$build  test=$test_status tests=$tests(baseline $b_tests)  lint=${errs}e/${warns}w (baseline ${b_err}e/${b_warn}w) lint:$lint  lessons=$lessons_gate  => CHECK-APP $verdict"
+if [ "$fail" -eq 1 ]; then
+  echo "CHECK-APP FAILED. Do NOT commit. baseline.json tolerates NO failing test (tests.count is a"
+  echo "floor, not an allowance) and NO type error; only lint has a tolerated count."
+fi
 if [ "$fail" -eq 1 ]; then
   echo "--- failing output (tail) ---"
   [ "$typecheck" = "FAIL" ] && { echo "[typecheck — every one of these must be fixed; there is no baseline]"; tail -40 "$tmp/typecheck.log"; }
