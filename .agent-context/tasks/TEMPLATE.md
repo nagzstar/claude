@@ -41,17 +41,19 @@ Decided once, here. Implementing agents follow this rather than redesigning.
 - [ ] COMPLETE — reported; context files updated if architecture changed
 
 ## Status / Log
-- <date> — what happened, decisions made, models used, escalations.
+- <date> — one line per event (agent returned / round N / pushed <sha> / check-dev PASS). ≤ 25 lines.
 
 ## Test Results
-check-app summary line; QA PASS/FAIL/WARNING summary; security-reviewer summary; check-dev result.
+check-app summary line; QA status + count of findings; security status + count; check-dev line;
+per-role DEV status matrix. ≤ 12 lines — the reviewers' full reports stay in their own returns.
 
 ## Remaining Risks
-Anything unresolved, unverified, or deferred — including what the user must know before PROD.
+≤ 8 lines: what the user must know before PROD.
 
 ## Lessons Learnt
-What would be done differently, what surprised the team, what a future task must know.
-Durable ones are appended to `NGM_ROOT/.agent-context/lessons.md` at COMPLETE.
+≤ 5 lines. The durable ones (usually 0–2) go to the lessons index as ONE line each with a
+pointer to `lessons/<domain>.md`. A lesson that already exists becomes a gate, not a repeat.
+Whole file target ≤ 12 KB; the READY FOR PROD comment is the report, not this file.
 
 ## Problems Spotted (out of scope for this task)
 | Problem | Owner | Tier |

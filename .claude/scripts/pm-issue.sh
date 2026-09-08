@@ -13,13 +13,14 @@
 #   bash .claude/scripts/pm-issue.sh new <type> "<title>" <body-file> [found-in-issue]
 #                                                                # file a bug/idea, labelled claude + <type>
 #   bash .claude/scripts/pm-issue.sh members <n>                 # a batch's members: number, state, labels, title
+#   bash .claude/scripts/pm-issue.sh next                        # the open, ready items of the pinned "Delivery order", in sequence
 #
 # Statuses (one at a time; none = an unrefined idea):
 #   needs-info → ready → in-progress → ready-for-prod | needs-decision | blocked → (closed = released)
 # Type labels: feature bug improvement infrastructure security ui admin mobile.
 # `claude` marks anything Claude filed on its own initiative (bugs, ideas, problems spotted).
 # `batch` marks an umbrella issue whose "## Members" section lists the issues one session
-# delivers together; pm-run-issue.sh reads that section (user decision, 2026-09-07).
+# delivers together; pm-run-issue.sh reads that section (.agent-context/decisions.md).
 
 set -u
 REPO="${NGM_REPO:-nagzstar/ngm.app}"
@@ -136,6 +137,27 @@ case "$cmd" in
           gh issue view "$m" -R "$REPO" --json number,title,state,labels \
             --jq '"#\(.number)\t\(.state)\t\([.labels[].name]|join(","))\t\(.title)"' 2>/dev/null \
             || printf '#%s\tMISSING\n' "$m"
+        done
+    ;;
+
+  next)
+    # The pinned "Delivery order" issue's "## Order" section is the sequence; only a `#n` that
+    # LEADS a numbered/bulleted line counts. Print the ones that are open and `ready`, in order,
+    # skipping blocked / needs-decision / in-progress / ready-for-prod (each with a reason).
+    need_gh
+    order="${NGM_ORDER_ISSUE:-$(gh issue list -R "$REPO" --state open --search '"Delivery order" in:title' --json number --jq '.[0].number' 2>/dev/null)}"
+    is_number "$order" || die "no open issue titled \"Delivery order\" (set NGM_ORDER_ISSUE=<n> to name it)"
+    gh issue view "$order" -R "$REPO" --json body --jq .body \
+      | sed -n '/^## Order/,/^## /p' | tr -d '\r' \
+      | grep -oE '^[[:space:]]*([0-9]+\.|-|\*)[[:space:]]*#[0-9]+' | grep -oE '[0-9]+$' | awk '!seen[$0]++' \
+      | while read -r n; do
+          info="$(gh issue view "$n" -R "$REPO" --json state,title,labels --jq '"\(.state)\t\([.labels[].name]|join(","))\t\(.title)"' 2>/dev/null || echo "MISSING")"
+          state="${info%%	*}"; rest="${info#*	}"; labels="${rest%%	*}"; title="${rest#*	}"
+          case "$state" in OPEN) ;; *) continue ;; esac
+          case ",${labels}," in
+            *,ready,*) printf '#%s\t%s\n' "$n" "$title" ;;
+            *) printf '#%s\t(skipped: %s)\t%s\n' "$n" "$(printf '%s' "$labels" | tr ',' '\n' | grep -E '^(blocked|needs-decision|in-progress|ready-for-prod|needs-info)$' | head -1)" "$title" >&2 ;;
+          esac
         done
     ;;
 

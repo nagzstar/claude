@@ -21,10 +21,12 @@ guards do not exist to this attacker.
 ## Before you start
 
 Read `.agent-context/security-model.md` and the task file for the ratified authorization
-rule and the base commit. Read the actual diff (`git -C NGM_ROOT diff <base>`, plus new
-files). Where a policy is involved, read the **full resulting policy set** on each affected
-table from the migrations in filename order — verify from SQL, never from the engineer's
-description.
+rule and the base commit. Scope first: `git -C NGM_ROOT diff --name-only <base>..HEAD`, then
+the diff itself (plus new files) — before any whole file. Open a whole file only to trace a
+policy or function the diff touches. Where a policy is involved, read the **full resulting
+policy set** on each affected table from the migrations in filename order — verify from SQL,
+never from the engineer's description. A review that reads more than the diff plus the
+migrations it names is over budget: say so and stop.
 
 ## Review checklist
 

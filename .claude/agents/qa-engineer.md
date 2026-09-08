@@ -52,9 +52,13 @@ Pre-existing lint problems are not findings for this task; a mass lint fix is a 
 Run `bash "$CLAUDE_PROJECT_DIR/.claude/scripts/check-dev.sh" --sha <sha>` (a short sha is
 resolved for you; no runs found is a FAIL, never a pass). Confirm the runs
 succeeded and then confirm the behaviour is live at https://dev.nextgenmaher.com — fetch the
-relevant route, check the deployed bundle contains the change, and exercise what you can
-without credentials. Never use https://nextgenmaher.com as evidence and never trigger any
-deployment. A role-gated flow you cannot exercise goes under Not tested, explicitly.
+relevant route, check the deployed bundle contains the change, and exercise it **per role**:
+DEV validation is yours, never the Orchestrator's. Sign in as the DEV test accounts (the
+`NGM_DEV_*` variables named in `TEST-ACCOUNTS.md`; never read `.env`, never print a token or
+key) and probe REST/RPC/storage for every acceptance criterion with a role dimension; report
+the status matrix (anon / participant / mentor / admin) verbatim. Never use
+https://nextgenmaher.com as evidence and never trigger any deployment. A role-gated flow you
+cannot exercise goes under Not tested, explicitly.
 
 ## Cost check
 

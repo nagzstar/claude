@@ -95,70 +95,8 @@ this skill. Everything below is a snapshot, not an authority.
 - Treat DNS and auth configuration as production-affecting **even when applied from the dev
   workspace**, because the zone and the domain are shared.
 
-## Lessons learnt
+## Lessons and known problems
 
-From `user-signup-approval` (2026-09-06). Confirmed unless marked inferred.
-
-- **Configuration living outside version control broke a shipped feature three separate times
-  while every pipeline stayed green** — the SMTP sender, then `site_url`, then
-  `uri_allow_list`. Green pipelines proved the code deployed, not that the feature worked.
-  When a feature depends on a dashboard setting, move that setting into Terraform as part of
-  the same task; that is the durable fix, not a note to remember.
-- **A plan authored without knowledge of the repo needed adapting, not following.** A proposed
-  greenfield `infra/` layout plus an auto-applying workflow would have duplicated the existing
-  root and removed the production gate. The substance was right; the structure was not.
-- **Check the remote runner's Terraform version before raising `required_version`.** It was
-  flagged unverifiable, then confirmed as 1.16.1 on both workspaces through the HCP API in a
-  single call. A cheap check turned a stated risk into a closed one.
-- **Pre-flighting DNS prevented a real hazard.** Querying `_dmarc`, apex `MX` and apex `TXT`
-  showed the domain served no mail at all, so the new records could not disrupt or duplicate
-  anything. On a shared zone, never apply DNS blind.
-- **Let the next natural plan answer open questions instead of spending a run on them.** A
-  suspected perpetual diff on a hashed secret was left open deliberately; the following plan
-  said `No changes` and closed it for free. Actions minutes are the scarcest resource.
-- Gating both new capabilities behind per-environment flags meant prod could be prepared,
-  pushed and planned with **zero** risk to prod, and reviewed before anyone dispatched it.
-- The order that actually worked: read the existing root → adapt the design → gate per
-  environment → `fmt` → push → read both plan legs → apply dev → verify outside Terraform →
-  prepare prod → ask the user "Shall I deploy this to prod?" → dispatch prod on their yes.
-
-## Known problems
-
-- **OPEN — the `guard-prod` hook false-positives on documentation.** It greps the whole Bash
-  command string, so writing a file whose *content* mentions a pipeline-only command (a
-  heredoc documenting a Supabase push, for example) is blocked as if it were that command.
-  Encountered while authoring these skills; worked around by using the Write tool, which the
-  hook's `Bash` matcher does not cover. Not a security hole — it fails closed — but it will
-  confuse future agents, and the workaround is undocumented. *Confirmed.* **Fix belongs in
-  `C:\Users\nagaj\git\claude`, so it is reported, not fixed here.**
-- **OPEN — workflow actions are pinned to major tags, not commit SHAs**, and
-  `supabase/setup-cli` uses `version: latest`, so an infrastructure or migration run is not
-  reproducible and a compromised tag flows straight into deploys. SHA-pinning is free.
-  *Confirmed*; also tracked in `.agent-context/lessons.md`.
-- **OPEN — no IaC security scanning.** No tfsec, checkov or trivy. All free and OSS; cost is
-  Actions minutes only when they run. *Confirmed.*
-- **OPEN (constraint) — long-lived secrets, no OIDC.** Cloudflare and Supabase do not offer
-  GitHub-OIDC federation, so rotation and least-privilege scoping are the only realistic
-  controls. *Confirmed.*
-- **OPEN (cost trap) — Resend's free tier is 100 emails per DAY across the whole account,
-  while the Supabase setting it feeds is per HOUR**, and dev and prod share that quota. A
-  per-hour limit near 100 can spend a day's allowance in an hour and silently break password
-  resets for real users. Prod is set to 20/hour for this reason; dev remains at 100/hour and
-  is the more likely offender. *Confirmed from the provider's published free-tier limits.*
-- **RESOLVED — suspected perpetual diff on the hashed SMTP password.** The next plan reported
-  `No changes`. There is no perpetual diff. *Confirmed.*
-
-## Open questions
-
-- Prod auth email was prepared but, at the time of writing, **not applied** — the three prod
-  dispatches are the user's. Whether prod should keep a Resend API key separate from dev's
-  (the intent recorded in `terraform/env/prod.tfvars`) or share one has not been confirmed in
-  practice.
-- `manage_email_dns` is false for prod because dev owns the shared-zone records. If the dev
-  workspace were ever torn down, prod would lose its verified sender. No runbook covers that.
-- Whether the Supabase email-confirmation setting should itself be managed in Terraform is
-  undecided; it is deliberately absent from the managed blob so the dashboard value stands.
-
-## Last synced
-
-`C:\Users\nagaj\git\claude` @ `6a946f1862e21ae4ea80ff7faa02e6919172de5b` (2026-09-06).
+They live in `NGM_ROOT/.agent-context/lessons.md` (the index) and `lessons/delivery.md` — read the
+delivery file before you start; it is the lessons for your files. Nothing is recorded here: a skill
+is a procedure, and lessons written into three skills went stale within a day (retro 2026-09-08).

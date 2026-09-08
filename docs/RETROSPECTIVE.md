@@ -29,7 +29,7 @@ the target with no counterpart in the source is `Remove-Item -Recurse -Force`d. 
 files are likewise overwritten from source. Confirmed by reading lines 20–43 of the script.
 **Impact.** Everything delivered by this task into `.claude/` is destroyed by the next
 install: all three SKILL.md files, and the `skills:` frontmatter added to `backend-engineer`
-and `frontend-engineer`. Two things survive — `.claude/skills/RETROSPECTIVE.md`, because the
+and `frontend-engineer`. Two things survive — `docs/RETROSPECTIVE.md` (moved out of the skills tree on 2026-09-08), because the
 stale-removal loop only iterates directories and this is a loose file, and
 `NGM_ROOT/.agent-context/lessons.md`, which lives in ngm.app and is never installed.
 **Rule:** durable agent-system changes belong in `C:\Users\nagaj\git\claude`, not in the

@@ -16,9 +16,15 @@ Source of truth: GitHub Issues on `nagzstar/ngm.app`. No Projects board, no mile
 Actions automation (free tier; Actions minutes are scarce). Everything you need is two scripts:
 
 ```
-bash .claude/scripts/pm-issue.sh      labels | list | show <n> | status <n> <s> | priority <n> <P> | comment <n> <file> | new <type> "<title>" <file> [from] | members <n>
+bash .claude/scripts/pm-issue.sh      labels | list | show <n> | status <n> <s> | priority <n> <P> | comment <n> <file> | new <type> "<title>" <file> [from] | members <n> | next
 bash .claude/scripts/pm-run-issue.sh  <n> [--model claude-fable-5-1] [--dry-run]      # <n> is a ticket or a batch umbrella
+bash .claude/scripts/pm-run-issue.sh  --queue                                        # every ready item in the delivery order, one after another
 ```
+
+The PM conversation runs on the model `settings.json` pins (Opus in `ngm.app`); do not raise it.
+A day of PM on Fable cost more than four feature runs (retro 2026-09-08): this conversation is
+plumbing plus one judgement per item, and it lives long enough for cache-read to dominate.
+Standing decisions live in `.agent-context/decisions.md`: assume them, never re-ask them.
 
 ## Vocabulary
 
@@ -43,6 +49,11 @@ Run `pm-issue.sh labels` once per session start; it is idempotent and creates an
 3. If `lessons.md` still holds a "Problems spotted" table, offer once to file each row as its
    own `claude`-labelled issue (`pm-issue.sh new`) and replace the table with a pointer. Do it
    only when the user says yes; it is many outward-facing writes.
+4. **Triage on Haiku, not here.** When `claude` issues have arrived since the last session,
+   run one `Explore` (`model: haiku`, read-only) over `pm-issue.sh list --all`: group the
+   `claude` issues that change the same file or function, flag duplicates by title and body,
+   propose batch membership per surface, and return a table. Decide from the table; do not
+   read fifty issues in this conversation.
 
 ## Fleshing out a ticket
 
@@ -58,6 +69,8 @@ shape (the existing `## Idea` / `## Notes` bodies are the unrefined form of it):
 ## Open questions  only what is genuinely still undecided (an empty section is the goal)
 ## Security & cost security surface (auth/roles/RLS/edge functions/user data: yes/no + what);
                    cost: free, or the figure and the free alternative
+## Pattern         P1–P5 from .agent-context/patterns.md, with deviations — or "none: needs a design"
+## Tier            2 | 3 | 4 and the one reason (drives the models and whether an architect runs)
 ## Depends on      #refs, or "nothing"
 ```
 
@@ -94,6 +107,13 @@ How to get there:
 
 Status: `needs-info` while you are still asking; `ready` when the body is complete, the user
 has agreed it, and Open questions is empty. Only the user can say an issue is ready.
+
+**Ready means all of:** every Open question is empty **or** moved to Decisions with a date;
+the data source and the authorization rule are decided (not "to be discussed"); Pattern and
+Tier are filled; Depends-on items are `ready-for-prod` or released; the user has said "ready".
+A decision changed after `ready` puts the ticket back to `needs-info` — and a session running
+on it is stopped first. Two designs were written and paused for #68 in one evening because the
+source decision moved after PLAN; that is the failure this checklist prevents.
 
 ## Batching
 
@@ -164,23 +184,28 @@ How to propose one:
    this conversation, lifts a block, and you record that by setting the status back to
    `ready` before it can be picked — `pm-run-issue.sh` refuses a `blocked` issue outright.
    Say which and why in two sentences — with its title — and name any ticket you skipped
-   over and its blocker in one line — then ask **once** ("Start #N <title> now?") — a
-   feature session is long and cannot be un-run. When the user said "work through the ready
-   items", do not ask per item and do not stop at a blocked one: skip it, mention it, go on.
-2. `bash .claude/scripts/pm-run-issue.sh <n>` — **in the background** (it outlives a
-   foreground tool call), then wait for it to finish; the harness tells you when. Tail the
-   `.log` it names if the user asks how it is going. **One feature at a time**, always a new
-   session: never deliver an issue inside your own conversation, and never launch a second
-   session while one runs (single checkout; the script locks).
+   over and its blocker in one line — then **start it**. The standing instruction is "work
+   through the ready items" (`decisions.md`): do not ask per item and do not stop at a blocked
+   one — skip it, mention it, go on. Ask only when the next item is P2/P3 with nothing above
+   it ready, or when the user asked to be consulted per item.
+2. `bash .claude/scripts/pm-run-issue.sh --queue` runs every ready item in the delivery order,
+   one session at a time (`pm-issue.sh next` shows the queue); `pm-run-issue.sh <n>` runs one.
+   Launch it **in the background** (it outlives a foreground tool call), then wait for it to
+   finish; the harness tells you when. Tail the `.log` it names if the user asks how it is
+   going. **One feature at a time**, always a new session: never deliver an issue inside your
+   own conversation, and never launch a second session while one runs (single checkout; the
+   script locks). The queue stops by itself on a session-limit message, an incomplete run or
+   an empty queue; `needs-decision`/`blocked` outcomes are skipped and reported at the end.
 3. When it returns, read the final report it prints and `pm-issue.sh show <n>`. Check that
    the session left the right status label and comment; if it died without them, post the
-   comment yourself from the `.json` result and set the status. Then tell the user, in the
-   `CLAUDE.md` report format, condensed to what changed and what they must decide.
+   comment yourself from the `.json` result and set the status. Then tell the user what
+   changed and what they must decide, in ≤ 15 lines with a link to the READY FOR PROD
+   comment — that comment is the report; do not restate it.
 4. Outcomes:
    - **READY FOR PROD** — report it, then ask exactly **"Shall I deploy this to prod?"**. On an
-     explicit yes, do the release yourself as the Orchestrator per `CLAUDE.md` (grant,
-     dispatch in order, watch, validate read-only, revoke), comment "🚀 RELEASED TO PROD" with
-     run ids and evidence, and **close the issue** — for a batch, the umbrella and every
+     explicit yes, do the release yourself as the Orchestrator per `CLAUDE.md` (`prod-approval.sh
+     grant`, then `prod-release.sh <sha> --record <task-file>`), comment "🚀 RELEASED TO PROD"
+     with the run ids it printed, and **close the issue** — for a batch, the umbrella and every
      member that was released. Anything else: it stays `ready-for-prod`.
    - **NEEDS-DECISION / BLOCKED** — put the session's questions to the user now. Record the
      answers as a comment and under `## Decisions`, set the status back to `ready`, and it
@@ -188,7 +213,9 @@ How to propose one:
      session to read the comments first), or the user may `claude --resume <id>` in `ngm.app`.
    - **Bugs and ideas** the session filed arrive labelled `claude`. Triage them next time you
      list the backlog: a type label, a priority if obvious, `needs-info` if not.
-5. Continue with the next item only if the user asked for more than one.
+5. Continue with the next ready item until the sequence is empty, a session ends
+   NEEDS-DECISION/BLOCKED with a question only the user can answer, or a limit reset is being
+   waited on. Stop only when the user asked to be consulted per item.
 
 ## Rules that do not bend
 

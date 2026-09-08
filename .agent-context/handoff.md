@@ -27,6 +27,13 @@ RELEVANT FILES:
   - path — why it matters / what to do there
   - path — read-only, for pattern reference
 
+FACTS (from the Explore sweep; do not re-explore):
+  - pattern in use (patterns.md id) / files that implement it / migrations touching these tables
+  - base commit <sha>; changed files so far: `git diff --name-only <sha>..HEAD`
+
+LESSONS THAT APPLY (≤ 5 lines copied from the lessons index):
+  - …
+
 CURRENT BEHAVIOUR:  what happens today.
 EXPECTED BEHAVIOUR: what should happen.
 
@@ -64,7 +71,9 @@ Both agents work in the same checkout; neither commits.
 
 ## Returning work for correction
 
-Send the specific findings, not the whole QA report:
+Send the specific findings, not the whole QA report — to the SAME agent, with `SendMessage`
+(its context, design and files are already loaded; a fresh Agent call re-reads ≈ 80 K tokens).
+Spawn fresh only if the agent is gone, or when escalating the model:
 
 ```
 CORRECTION REQUIRED — <task>   (round N of 2)

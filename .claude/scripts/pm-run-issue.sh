@@ -5,13 +5,12 @@
 # its final report. This is how the Project Manager mode (skill ngm-project-manager) hands work
 # to the Orchestrator: a new process per item, so the PM conversation stays small and each
 # item gets a full, clean context. Batches exist because per-session overhead was making the
-# backlog grow faster than delivery (user decision, 2026-09-07).
+# backlog grow faster than delivery (.agent-context/decisions.md).
 #
 #   bash .claude/scripts/pm-run-issue.sh <issue-or-batch-number> [options]
+#   bash .claude/scripts/pm-run-issue.sh --queue [options]     # every ready item in the delivery order, in turn
 #     --model <id>              session model (default: claude-opus-5 for a single ticket, claude-fable-5-1
-#                               for a batch umbrella — the Orchestrator's own loop is 3–8% of a session's
-#                               tokens and decides contracts, tiers and correction rounds; user decision
-#                               2026-09-07, to be checked against #31 after the first two batches)
+#                               for a batch umbrella — see .agent-context/decisions.md)
 #     --permission-mode <mode>  default: $PM_PERMISSION_MODE or "auto"
 #     --effort <level>          low|medium|high|xhigh|max (default: the CLI default)
 #     --force                   start even if a task file is IN PROGRESS / IN REVIEW / BLOCKED
@@ -23,6 +22,12 @@
 # closed or `blocked` is left out with a warning and the rest still run; a batch with no
 # eligible member is refused. `--print-prompt` never calls gh, so it shows the single-issue
 # prompt; use `--dry-run` to see the batch prompt.
+#
+# --queue: `pm-issue.sh next` lists the open, `ready` items of the pinned "Delivery order" in
+# sequence; each is run as above, one session at a time. The queue stops on the first run that
+# ends without a result, hits the subscription limit (the log says so; wait for the reset it
+# names, then re-run --queue) or leaves its issue `in-progress`; a `needs-decision` or
+# `blocked` outcome is skipped and listed at the end. It can never reach prod.
 #
 # The session takes as long as the feature takes (typically 20–90 minutes). Run it in the
 # background and tail the .log file it names. It can never reach prod: the guard-prod hook
@@ -38,24 +43,54 @@ REPO="${NGM_REPO:-nagzstar/ngm.app}"
 model="claude-opus-5"; model_set=0
 mode="${PM_PERMISSION_MODE:-auto}"
 effort=""
-force=0; dry=0; print_prompt=0
+force=0; dry=0; print_prompt=0; queue=0
 issue=""
+passthrough=()
 
 die() { echo "pm-run-issue: $*" >&2; exit 2; }
 
 while [ $# -gt 0 ]; do
   case "$1" in
-    --model) model="${2:-}"; model_set=1; shift 2 ;;
-    --permission-mode) mode="${2:-}"; shift 2 ;;
-    --effort) effort="${2:-}"; shift 2 ;;
-    --force) force=1; shift ;;
-    --dry-run) dry=1; shift ;;
+    --model) model="${2:-}"; model_set=1; passthrough+=("$1" "$2"); shift 2 ;;
+    --permission-mode) mode="${2:-}"; passthrough+=("$1" "$2"); shift 2 ;;
+    --effort) effort="${2:-}"; passthrough+=("$1" "$2"); shift 2 ;;
+    --force) force=1; passthrough+=("$1"); shift ;;
+    --dry-run) dry=1; passthrough+=("$1"); shift ;;
     --print-prompt) print_prompt=1; shift ;;
-    -h|--help) sed -n '2,24p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    --queue) queue=1; shift ;;
+    -h|--help) sed -n '2,31p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
     *) [ -z "$issue" ] && printf '%s' "$1" | grep -Eq '^[0-9]+$' && { issue="$1"; shift; continue; }
        die "unexpected argument: $1" ;;
   esac
 done
+
+# ---- --queue: run the ready items of the delivery order, one session after another ----------
+if [ "$queue" -eq 1 ]; then
+  [ -z "$issue" ] || die "--queue takes no issue number"
+  here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+  items="$(bash "$here/pm-issue.sh" next 2>/dev/null | awk '{print $1}' | tr -d '#')"
+  [ -n "$items" ] || die "the delivery order has no open, ready item"
+  echo "pm-run-issue: queue → $(printf '#%s ' $items)"
+  skipped=""; run_rc=0
+  for n in $items; do
+    echo; echo "================ queue: #$n ================"
+    bash "$0" "$n" "${passthrough[@]}"; run_rc=$?
+    labels="$(gh issue view "$n" -R "$REPO" --json labels --jq '[.labels[].name]|join(",")' 2>/dev/null || echo "")"
+    latest_log="$(ls -1t "$NGM_ROOT"/.agent-context/pm-runs/issue-"$n"-*.log 2>/dev/null | head -1)"
+    if [ -n "$latest_log" ] && grep -qi "session limit" "$latest_log"; then
+      echo "!!! queue stopped: #$n hit the subscription limit — $(grep -m1 -oi 'session limit[^|\"]*' "$latest_log"). Re-run --queue after the reset."
+      exit 3
+    fi
+    case ",${labels}," in
+      *,ready-for-prod,*) echo "queue: #$n ready-for-prod" ;;
+      *,needs-decision,*|*,blocked,*) skipped="${skipped:+$skipped }#$n"; echo "queue: #$n set aside ($labels)" ;;
+      *) echo "!!! queue stopped: #$n ended '${labels:-unknown}' (rc=$run_rc) — check the disk and git log before continuing"; exit 1 ;;
+    esac
+  done
+  echo; echo "queue finished. ${skipped:+needs the user: $skipped — }nothing was released: prod is the user's decision."
+  exit 0
+fi
+
 [ -n "$issue" ] || die "an issue number is required (see --help)"
 
 # ---- the prompt ---------------------------------------------------------------------------
@@ -154,9 +189,11 @@ Delivery
   product behaviour, cost or security, stop at NEEDS-DECISION and ask it in the comment.
 
 Finishing — before your final message
-- READY FOR PROD → \`pm-issue.sh status ${issue} ready-for-prod\` and a comment headed
-  "✅ READY FOR PROD" containing: commit sha(s), DEV pipeline run ids, what was validated on
-  DEV and how, release notes, risks, and the resume command above.
+- READY FOR PROD → \`pm-issue.sh status ${issue} ready-for-prod\` and ONE comment headed
+  "✅ READY FOR PROD" in the CLAUDE.md report format (Completed … Prod), ≤ 60 lines: commit
+  sha(s), DEV pipeline run ids, what was validated on DEV and how (the per-role status
+  matrix), release notes, risks, and the resume command above. That comment IS the report:
+  do not repeat it in the chat, the task file or lessons.md (≤ 5 lesson lines, ≤ 2 durable).
 - NEEDS-DECISION → status \`needs-decision\`; BLOCKED → status \`blocked\`. The comment,
   headed "❓ NEEDS DECISION" or "⛔ BLOCKED", lists the numbered questions or the blocker,
   what is already done (commit sha if pushed) and the resume command.
@@ -166,7 +203,7 @@ Finishing — before your final message
 - Commit the task file. Never close the issue. Never dispatch environment=prod, never rerun
   a prod run, never weaken a production control. Do not wait for an answer to "Shall I
   deploy this to prod?" — put READY FOR PROD in the comment and end.
-- Your final message is the standard report from CLAUDE.md, ending with the Prod line.
+- Your final message is two lines: "Report: <the comment's URL>" and the Prod line.
 EOF
 }
 
@@ -183,8 +220,8 @@ fi
 [ -d "$NGM_ROOT/.git" ] || die "NGM_ROOT is not a git checkout: $NGM_ROOT"
 gh auth status >/dev/null 2>&1 || die "gh is not authenticated"
 gh issue view "$issue" -R "$REPO" --json state --jq .state | grep -qx OPEN || die "issue #$issue is not an open issue in $REPO"
-# A blocked ticket is never started, whatever its place in the delivery order (user decision,
-# 2026-09-07). The PM lifts the block by setting the status back to `ready`; no override here.
+# A blocked ticket is never started, whatever its place in the delivery order
+# (.agent-context/decisions.md). The PM lifts the block by setting the status back to `ready`.
 if gh issue view "$issue" -R "$REPO" --json labels --jq '.labels[].name' | grep -qx blocked; then
   die "issue #$issue is labelled 'blocked' — skip to the next ready item in the delivery order;
   only the user can lift the block (pm-issue.sh status $issue ready after their say-so)"

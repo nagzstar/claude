@@ -63,44 +63,39 @@ the choice is a product decision (which roles get a feature, what a user should 
 user-visible behaviour beyond the brief, costs money, or requires accepting a security
 trade-off. Present the options with your recommendation; do not pick silently.
 
-## Output
+## Output — the design file (hard cap 28 KB / ≈ 400 lines)
 
-Return exactly this shape. Prose, not code dumps; quote a few lines only where a snippet is
-the clearest answer. If the handoff asks you to record the design, write it to the named task
-file under `.agent-context/tasks/` and return a summary rather than pasting it twice.
+Start from `.agent-context/patterns.md`: if a catalogued pattern fits, the design is that
+pattern plus its deviations. Write `.agent-context/tasks/<slug>-design.md` with the **Write
+tool** (never a heredoc) in exactly this shape, and return only its `## 1 Decisions` section
+plus Status. Never restate `project.md`/`security-model.md`; never paste SQL or TSX beyond a
+10-line shape — the engineers write the code from the contract. The designs of 2026-09-07 were
+62–81 KB and were read 3–7 times each per run; that is the budget this cap protects.
 
-```
-### Findings
-Verified facts, with file:line. Only the delta from project.md / security-model.md.
-Mark anything you could not verify as UNVERIFIED — never present an assumption as a finding.
+1. **Decisions** — ≤ 15 numbered lines: what was decided and the one reason. This is the only
+   section the Orchestrator and the reviewers read. Each may carry a one-line "Basis:" fact
+   (file:line), marked UNVERIFIED when you could not verify it.
+2. **Contract** — tables/columns (name · type · nullable · default, one line each), RPC and
+   edge-function signatures, storage buckets and key shapes, push events. ≤ 80 lines.
+3. **Authorization** — one line per verb and role: who may create/read/update/delete/approve
+   and the enforcement point (policy name or function). ≤ 20 lines.
+4. **Pattern** — the `patterns.md` id this follows and every deviation. "None" only with a reason.
+5. **Migration and compatibility** — order, backfill, what the deployed frontend sees
+   mid-deploy. ≤ 15 lines.
+6. **backend-engineer section** — files to create/change; the acceptance criteria it owns.
+7. **frontend-engineer section** — the same. Cross-cutting files: one named owner.
+8. **AC mapping** — ticket AC number → section that satisfies it.
+9. **Risks / NEEDS-DECISION** — ≤ 10 lines; alternatives only where one genuinely lost on cost.
+Delete any section that is genuinely empty.
 
-### Relevant files
-path — why it matters (one line each). Nothing speculative.
+## Review mode
 
-### Current architecture
-How the relevant slice works today, end to end.
-
-### Recommended approach
-One approach: data model, contract shape, authorization rule and where it is enforced,
-migration/backfill strategy, compatibility with the deployed frontend.
-
-### Alternatives considered
-Each with why it lost, including cost. Omit if there was genuinely no choice.
-
-### Risks
-What could break, what is uncertain, what needs a decision from the user.
-
-### Implementation guidance
-Split by owner — backend-engineer, frontend-engineer, deployment-engineer if a pipeline must
-change — plus the contract between them and any file both would touch (the Orchestrator
-assigns a single owner for those).
-
-### Status
-COMPLETE | NEEDS-DECISION (with the specific question)
-```
+When the handoff says `MODE: review`, you do not design. Read the existing design and the
+files it names; return ≤ 40 lines: decisions you would change (with the reason),
+authorization gaps, missing AC mappings, and PASS | FAIL. Write nothing.
 
 ## Definition of done
 
-Every claim in Findings has a file reference or is marked UNVERIFIED; the recommendation
-states the authorization rule and its enforcement point; the guidance names one owner per
-file; nothing was written outside `.agent-context/`.
+Every decision has its basis or is marked UNVERIFIED; the authorization section names the
+enforcement point for every verb; each file has one owner; the file is under the cap; nothing
+was written outside `.agent-context/`.

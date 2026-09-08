@@ -100,59 +100,8 @@ previous Pages deployment** — done by the user in the Cloudflare dashboard, or
 non-destructive rollback path; the database has none. If a release pairs an app change with a
 migration, rolling back the app does **not** roll back the schema.
 
-## Lessons learnt
+## Lessons and known problems
 
-From `user-signup-approval` (2026-09-06). Confirmed unless marked inferred.
-
-- **Building for both branches of an unverified assumption paid for itself.** The design
-  assumed Supabase email confirmation would be off. It was on. Because the signup UI had been
-  told to handle *both* a session and a no-session result, the discovery cost nothing instead
-  of forcing a rework.
-- **Map new backend fields fail-open.** Reading `approval_status ?? 'approved'` meant a
-  frontend deployed ahead of its migration did not show every existing user a "pending" page.
-  Security is unaffected because the database is the real gate. This is what makes the
-  unordered app/migration pipelines survivable.
-- Extracting pure helpers into a plain `.ts` module removed four new lint warnings *and* gave
-  the tests a seam needing no Supabase mocking. Both benefits came from the same move.
-- Unit tests here only meaningfully cover pure functions. A green suite proves nothing about
-  RLS, edge-function authorization or the deployed bundle — say so rather than implying
-  coverage the tests do not have.
-- The order that actually worked: read `project.md` → change → `check-app.sh` → hand to the
-  Orchestrator → push → `check-dev.sh` → grep the deployed bundle → probe live behaviour.
-
-## Known problems
-
-- **OPEN — `.agent-context/baseline.json` records a stale test count.** It says the accepted
-  test count is 1, but `main` now carries 21 after this feature. `check-app.sh` only fails when
-  tests drop *below* baseline, so 20 tests could be deleted without the gate noticing. Fix with
-  `check-app.sh --update-baseline` once the user agrees the numbers. *Confirmed by reading
-  `baseline.json` against a live test run.* Not changed here: the script's own rule is that
-  the baseline moves only with the user's agreement. Note the installer force-copies
-  `.agent-context/*.json`, so the fix must land in the agent-system repo to survive.
-- **OPEN — no post-deploy smoke check inside the pipeline.** A deploy is considered good when
-  the step exits 0. `check-dev.sh` covers this after the fact, but nothing in `deploy.yml`
-  itself verifies the site. A `curl -f` after the Pages deploy is free and takes seconds.
-  *Confirmed*; also tracked in `.agent-context/lessons.md`.
-- **OPEN — `cancel-in-progress: true` on `deploy.yml`** can cancel an in-flight production
-  deploy if another prod run starts. *Confirmed by reading the workflow.*
-- **OPEN — lint fails on `main`** (see `baseline.json`), so lint can never become a blocking
-  gate until a dedicated clean-up task clears it. *Confirmed.*
-- **OPEN — no dependency scanning.** No `npm audit`, no Dependabot. Both free; scope triggers
-  narrowly to protect Actions minutes. *Confirmed.*
-- **OPEN (constraint) — build-once-promote is impossible.** Vite inlines `VITE_SUPABASE_*` at
-  build time, so dev and prod are necessarily different artefacts. Fixing it needs runtime
-  configuration, which is a deferred application change. Do not half-implement it. *Confirmed.*
-- **RESOLVED — a frontend deployed before its migration.** Handled by the fail-open mapping
-  above; no incident occurred. *Confirmed.*
-
-## Open questions
-
-- Desktop and mobile rendering for this feature were verified by code review and by the user
-  on a phone, never by an automated browser. Whether the project wants a real browser-based
-  check, and whether its Actions-minute cost is acceptable, is undecided.
-- There is no component or integration test coverage at all — only pure-function unit tests.
-  Whether that is an accepted trade-off or an unfunded gap has not been stated.
-
-## Last synced
-
-`C:\Users\nagaj\git\claude` @ `6a946f1862e21ae4ea80ff7faa02e6919172de5b` (2026-09-06).
+They live in `NGM_ROOT/.agent-context/lessons.md` (the index) and `lessons/application.md` — read the
+application file before you start; it is the lessons for your files. Nothing is recorded here: a skill
+is a procedure, and lessons written into three skills went stale within a day (retro 2026-09-08).

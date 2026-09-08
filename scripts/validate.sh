@@ -184,6 +184,44 @@ bash .claude/scripts/pm-run-issue.sh --help >/dev/null 2>&1 && ok || bad "pm-run
 bash .claude/scripts/pm-run-issue.sh --print-prompt >/dev/null 2>&1 && bad "pm-run-issue accepted a missing issue number" || ok
 bash .claude/scripts/pm-issue.sh >/dev/null 2>&1; [ $? -eq 2 ] && ok || bad "pm-issue.sh without a command should exit 2"
 grep -q "in-progress|" .claude/scripts/pm-issue.sh && grep -q "^claude|" .claude/scripts/pm-issue.sh && ok || bad "pm-issue.sh label set lacks claude or in-progress"
+printf "%s" "$p" | grep -q "Report: <the comment" && ok || bad "pm-run-issue prompt does not make the READY FOR PROD comment the report"
+grep -q "^  next)" .claude/scripts/pm-issue.sh && grep -q -- "--queue" .claude/scripts/pm-run-issue.sh && ok || bad "queue runner (pm-issue.sh next / pm-run-issue.sh --queue) missing"
+bash .claude/scripts/pm-run-issue.sh --queue 42 --print-prompt >/dev/null 2>&1 && bad "pm-run-issue accepted --queue with an issue number" || ok
+
+# ---- 7. context files the Orchestrator assumes -----------------------------------------------
+for f in .agent-context/patterns.md .agent-context/decisions.md; do
+  [ -f "$f" ] && ok || bad "$f missing"
+  grep -q "$(basename "$f")" CLAUDE.md && ok || bad "CLAUDE.md does not point at $f"
+done
+grep -q "MODE: review" .claude/agents/researcher-architect.md && ok || bad "researcher-architect lacks the review mode"
+grep -q "28 KB" .claude/agents/researcher-architect.md && ok || bad "researcher-architect lacks the design cap"
+for s in app-deployment db-deployment infra-deployment; do
+  grep -q "^## Lessons learnt" ".claude/skills/$s/SKILL.md" && bad "$s still carries a lessons section (they live in lessons.md)" || ok
+done
+[ -f .claude/skills/RETROSPECTIVE.md ] && bad "RETROSPECTIVE.md is a document, not a skill: it belongs in docs/" || ok
+grep -q "SendMessage" CLAUDE.md && grep -q "SendMessage" .agent-context/handoff.md && ok || bad "correction rounds do not continue the same agent context"
+
+# ---- 8. prod release script + installed copy -------------------------------------------------
+bash .claude/scripts/prod-release.sh 0123abc >/dev/null 2>&1; [ $? -eq 2 ] && ok || bad "prod-release.sh must refuse to run without a recorded approval (exit 2)"
+bash .claude/scripts/prod-release.sh >/dev/null 2>&1; [ $? -eq 2 ] && ok || bad "prod-release.sh without a sha should exit 2"
+grep -q "prod-release.sh" CLAUDE.md && ok || bad "CLAUDE.md prod release does not use prod-release.sh"
+grep -q "INSTALLED.json" scripts/install-into-repo.ps1 && ok || bad "installer writes no manifest"
+man="$NGM_ROOT/.claude/INSTALLED.json"
+if [ -f "$man" ]; then
+  node -e '
+    const fs=require("fs"),cr=require("crypto"),p=require("path");const [man,src,tgt,strict]=process.argv.slice(1);
+    const m=JSON.parse(fs.readFileSync(man,"utf8"));let bad=0;
+    const h=f=>cr.createHash("sha256").update(fs.readFileSync(f)).digest("hex");
+    for(const [rel,hash] of Object.entries(m.files)){
+      const t=p.join(tgt,rel); if(!fs.existsSync(t)){console.log("  missing in ngm.app: "+rel);bad++;continue}
+      if(h(t)!==hash){console.log("  changed in ngm.app since install: "+rel);bad++}
+      const s=p.join(src,rel); if(fs.existsSync(s)&&h(s)!==hash&&!/settings\.json$/.test(rel)){console.log("  source changed since install (re-run the installer): "+rel);bad++}
+    }
+    console.log(`installed copy: from ${m.source_commit} at ${m.installed_at}, ${bad} difference(s)`);
+    process.exit(bad&&strict==="1"?1:0)' "$man" "$root" "$NGM_ROOT" "${VALIDATE_INSTALLED_STRICT:-0}" && ok || bad "installed copy differs from its manifest (see above)"
+else
+  echo "note: no $man yet — run scripts/install-into-repo.ps1 to create it"
+fi
 
 echo "validate: $pass passed, $fail failed"
 [ "$fail" -eq 0 ]

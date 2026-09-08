@@ -99,66 +99,8 @@ irreversible when assessing risk.** Recovery means a new corrective migration, r
 shipped the same way. Prefer changes that are safe to leave in place if the next step is
 abandoned — another reason additive beats destructive.
 
-## Lessons learnt
+## Lessons and known problems
 
-From `user-signup-approval` (2026-09-06). All confirmed from the migrations and run logs
-unless marked inferred.
-
-- Verifying all ten `DROP POLICY` names against their source migrations was the single
-  highest-value review step in the task. A typo would have left the gate wide open while
-  looking entirely correct in review.
-- `ADD COLUMN ... NOT NULL DEFAULT 'approved'` did three jobs at once: created the column,
-  backfilled every existing row atomically so no current user was locked out, and covered the
-  window where the migration had landed but the new edge functions had not.
-- Auditing every direct write to `profiles` across `app/src` *before* the `REVOKE UPDATE` is
-  what stopped the column grants breaking `updateMentorProfile`. Do that grep first, always.
-- The trigger/edge-function collision was caught at design time. Left alone it would have
-  broken admin user creation outright, with the function deleting the new auth user.
-- A second, tiny migration to correct a role-seeding decision was cheaper and safer than
-  reworking the first one. Small forward migrations are the idiom here.
-- Verifying with a real low-privilege session found what reading SQL could not: it proved the
-  gate is re-evaluated **per request** rather than baked into the JWT, because revoking
-  approval changed the answer for the same unexpired token.
-- The order that actually worked: read all migrations → write one migration → fix colliding
-  edge functions in the same commit → push → confirm the pipeline applied it → probe live with
-  a real token → only then call it done.
-
-## Known problems
-
-- **OPEN — `has_role(uid, role)` and `is_approved(uid)` are approval/role oracles.** Both take
-  a caller-supplied uuid and are executable by any authenticated user, disclosing "is user X an
-  admin / approved". The `GRANT EXECUTE` is genuinely required for the policies to work, so
-  this is not simply removable; a zero-argument wrapper hardcoding `auth.uid()` would fix the
-  client-facing case. *Confirmed by live probe.* Also tracked in `.agent-context/lessons.md`.
-- **OPEN — `profiles.email` is user-writable with no UNIQUE constraint.** `authenticated`
-  retains `UPDATE (email)` because the app writes it, so a user can set their displayed email
-  to another user's address — and that address is what an admin sees when deciding to approve
-  them. Pre-existing; this work re-granted rather than introduced it. *Confirmed.*
-- **OPEN — `.agent-context/security-model.md` predates the approval gate.** Its policy matrix
-  no longer matches the migrations. Re-derive from the files, never from that document.
-  *Confirmed.*
-- **OPEN (constraint) — no down migrations and no automated schema rollback.** *Confirmed.*
-- **RESOLVED — deactivated accounts could have been locked out.** `is_approved()` requires
-  `is_active`, and the count of `is_active = false` rows had never been checked before the
-  gate shipped. It was run afterwards and returned **zero rows on dev**, so nobody was
-  affected. The rule it became: run the impact query *before* shipping a gate that reads an
-  existing column, not after. *Confirmed.*
-- **RESOLVED — edge functions colliding with the new trigger.** Fixed by upsert in the same
-  commit; proven live when an admin account was successfully created through the app UI.
-  *Confirmed.*
-
-## Open questions
-
-- The `is_active = false` count has **not** been run against **prod**. It must be checked
-  before or immediately after the prod migration.
-- Whether Supabase realtime withholds payloads from an unapproved subscriber was never proven
-  empirically. A subscription connected and received nothing, but no authorised write occurred
-  during the window to force a payload. RLS strongly implies it is filtered; that is an
-  inference, not evidence.
-- `supabase/config.toml` sets `verify_jwt = false`, and every function re-checks the Bearer
-  token in code instead. Whether that is a deliberate standing decision for all future
-  functions, or inherited from scaffolding, is not recorded anywhere.
-
-## Last synced
-
-`C:\Users\nagaj\git\claude` @ `6a946f1862e21ae4ea80ff7faa02e6919172de5b` (2026-09-06).
+They live in `NGM_ROOT/.agent-context/lessons.md` (the index) and `lessons/database.md` — read the
+database file before you start; it is the lessons for your files. Nothing is recorded here: a skill
+is a procedure, and lessons written into three skills went stale within a day (retro 2026-09-08).

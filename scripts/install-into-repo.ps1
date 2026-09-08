@@ -41,6 +41,9 @@ Get-ChildItem -Path "$Source\.claude\skills" -Directory | ForEach-Object {
 Get-ChildItem -Path "$Target\.claude\skills" -Directory | Where-Object {
   -not (Test-Path (Join-Path "$Source\.claude\skills" $_.Name))
 } | ForEach-Object { Write-Host "  removing stale skill $($_.FullName)"; Remove-Item $_.FullName -Recurse -Force }
+# Skills-root files (none today; RETROSPECTIVE.md moved to docs/) are synced too, so a document
+# that once lived there cannot drift in the installed copy (retro 2026-09-08, H13).
+Sync-Dir "$Source\.claude\skills" "$Target\.claude\skills" '*.md'
 
 # Additive: context files, baseline, templates. Task records are never removed. lessons.md is
 # NOT installed at all: ngm.app owns and tracks it (decision 2026-09-07, ngm.app#28).
@@ -78,6 +81,22 @@ Get-ChildItem -Path "$Target\.claude\hooks", "$Target\.claude\scripts" -Filter '
   [System.IO.File]::WriteAllText($_.FullName, $text, (New-Object System.Text.UTF8Encoding $false))
 }
 
+# Manifest: what was installed, from which source commit, with a hash per file.
+# `bash scripts/validate.sh` compares the installed tree (and the source) against it, so drift
+# between the two repos is a failing check instead of a retrospective finding.
+$commit = (git -C $Source rev-parse --short HEAD 2>$null)
+$manifest = [ordered]@{ source_commit = "$commit"; installed_at = (Get-Date).ToString('s'); files = [ordered]@{} }
+Get-ChildItem -Path "$Target\.claude\agents", "$Target\.claude\hooks", "$Target\.claude\scripts", "$Target\.claude\skills" -Recurse -File |
+  Where-Object { $_.Name -ne 'settings.local.json' } | Sort-Object FullName | ForEach-Object {
+    $rel = $_.FullName.Substring($Target.Length + 1) -replace '\\', '/'
+    $manifest.files[$rel] = (Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLower()
+  }
+foreach ($f in 'CLAUDE.md', '.agent-context/project.md', '.agent-context/security-model.md', '.agent-context/delivery.md', '.agent-context/handoff.md', '.agent-context/patterns.md', '.agent-context/decisions.md', '.agent-context/tasks/TEMPLATE.md') {
+  $p = Join-Path $Target ($f -replace '/', '\')
+  if (Test-Path $p) { $manifest.files[$f] = (Get-FileHash $p -Algorithm SHA256).Hash.ToLower() }
+}
+[System.IO.File]::WriteAllText("$Target\.claude\INSTALLED.json", ($manifest | ConvertTo-Json -Depth 5), (New-Object System.Text.UTF8Encoding $false))
+
 $agentCount = (Get-ChildItem "$Source\.claude\agents" -Filter '*.md').Count
 Write-Host "Installed the NGM agent system into $Target"
 Write-Host ""
@@ -86,7 +105,8 @@ Write-Host "  .claude/skills/         $((Get-ChildItem "$Source\.claude\skills" 
 Write-Host "  .claude/hooks/          guard-prod, guard-paths (synced)"
 Write-Host "  .claude/scripts/        check-app, check-dev, context-drift, prod-approval, pm-issue, pm-run-issue (synced)"
 Write-Host "  .claude/settings.json   permissions + hooks (additionalDirectories stripped; model pinned to claude-opus-5)"
-Write-Host "  .agent-context/         project, security-model, delivery, handoff, baseline, tasks (additive; lessons.md is owned by ngm.app, not installed)"
+Write-Host "  .agent-context/         project, security-model, delivery, handoff, patterns, decisions, baseline, tasks (additive; lessons.md is owned by ngm.app, not installed)"
+Write-Host "  .claude/INSTALLED.json  manifest (source commit $commit, sha256 per installed file; checked by validate.sh)"
 Write-Host "  CLAUDE.md               orchestrator contract"
 Write-Host ""
 Write-Host "Start a new console in $Target and give it an outcome."
