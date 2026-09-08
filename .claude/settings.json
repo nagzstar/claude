@@ -36,6 +36,7 @@
       "Bash(terraform fmt:*)",
       "Bash(terraform validate:*)",
       "Bash(terraform plan:*)",
+      "Bash(bash .claude/scripts/dev-probe.sh:*)",
       "Bash(curl -sS:*)"
     ],
     "deny": [
@@ -61,6 +62,16 @@
             "type": "command",
             "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/guard-prod.sh\"",
             "timeout": 30
+          }
+        ]
+      },
+      {
+        "matcher": "Agent",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/guard-agent.sh\"",
+            "timeout": 15
           }
         ]
       }

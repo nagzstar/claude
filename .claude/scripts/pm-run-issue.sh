@@ -218,6 +218,19 @@ fi
 [ -n "$claude_bin" ] && [ -x "$claude_bin" ] || die "claude CLI not found (set CLAUDE_CODE_EXECPATH or put claude on PATH)"
 
 [ -d "$NGM_ROOT/.git" ] || die "NGM_ROOT is not a git checkout: $NGM_ROOT"
+# The allow list in .claude/settings.json is ignored unless the workspace has been trusted once
+# interactively; every headless call is then adjudicated by the permission classifier (16/16 runs
+# on 2026-09-07 logged "Ignoring 32 permissions.allow entries"). Refuse to burn a session on that.
+trusted="$(node -e '
+  const fs=require("fs"),p=(process.env.USERPROFILE||process.env.HOME)+"/.claude.json";
+  try{const j=JSON.parse(fs.readFileSync(p,"utf8"));const P=j.projects||{};const want=process.argv[1].replace(/\\/g,"/").toLowerCase();
+    for(const k of Object.keys(P)) if(k.replace(/\\/g,"/").toLowerCase()===want && P[k].hasTrustDialogAccepted){console.log("yes");process.exit(0)}
+  }catch(e){} console.log("no")' "$NGM_ROOT" 2>/dev/null)"
+if [ "$trusted" != "yes" ] && [ "${PM_ALLOW_UNTRUSTED:-0}" != "1" ]; then
+  die "$NGM_ROOT has not been trusted, so the allow list would be ignored and every tool call classified.
+  Once: open 'claude' interactively in $NGM_ROOT, accept the trust dialog, then re-run.
+  (PM_ALLOW_UNTRUSTED=1 overrides — not recommended.)"
+fi
 gh auth status >/dev/null 2>&1 || die "gh is not authenticated"
 gh issue view "$issue" -R "$REPO" --json state --jq .state | grep -qx OPEN || die "issue #$issue is not an open issue in $REPO"
 # A blocked ticket is never started, whatever its place in the delivery order
@@ -275,6 +288,14 @@ fi
 ts="$(date -u +%Y%m%dT%H%M%SZ)"
 run_dir="$NGM_ROOT/.agent-context/pm-runs"; mkdir -p "$run_dir"
 base="$run_dir/issue-$issue-$ts"
+# A previous abnormal end may have left a draft stash (see the outcome section): tell the
+# session so it restores it instead of redoing the work.
+draft="$(git -C "$NGM_ROOT" stash list 2>/dev/null | grep -m1 "pm-run-issue draft #$issue " || true)"
+[ -n "$draft" ] && batch_block="${batch_block}
+
+A PREVIOUS SESSION LEFT A DRAFT: \`git stash list\` shows \"${draft}\". Read its diff first
+(\`git stash show -p <ref>\`), decide what to keep, \`git stash pop\` it before doing new work,
+and never redo what it contains."
 build_prompt > "$base.prompt.md"
 
 cmd=("$claude_bin" -p --session-id "$session_id" --name "issue-$issue" --model "$model" \
@@ -294,6 +315,7 @@ printf 'issue=%s\npid=%s\nsession=%s\nstarted=%s\nlog=%s\n' "$issue" "$$" "$sess
 trap 'rm -f "$lock"' EXIT
 
 cd "$NGM_ROOT" || die "cannot cd to $NGM_ROOT"
+export NGM_HEADLESS=1   # guard-agent.sh refuses run_in_background under this marker
 "${cmd[@]}" "$(cat "$base.prompt.md")" 2>>"$base.log" | node -e '
   // Turn the stream into a readable progress log and capture the final result object.
   const fs = require("fs");
@@ -301,6 +323,7 @@ cd "$NGM_ROOT" || die "cannot cd to $NGM_ROOT"
   const log = fs.createWriteStream(logPath, { flags: "a" });
   let buf = "", result = null;
   const line = s => log.write(new Date().toISOString().slice(11, 19) + " " + s + "\n");
+  line("TZ UTC (git and file times are local)");
   process.stdin.on("data", c => {
     buf += c;
     let i;
@@ -333,10 +356,50 @@ cd "$NGM_ROOT" || die "cannot cd to $NGM_ROOT"
 ' "$base.log" "$base.json"
 rc=$?
 
+# ---- outcome ----------------------------------------------------------------------------------
+ended="$(date -u +%Y%m%dT%H%M%SZ)"
+limit_line="$(grep -m1 -oE "hit your session limit[^\"|]*" "$base.log" 2>/dev/null || true)"
+final_labels="$(gh issue view "$issue" -R "$REPO" --json labels --jq '[.labels[].name]|join(",")' 2>/dev/null || echo "")"
+outcome="incomplete"
+case ",${final_labels}," in
+  *,ready-for-prod,*) outcome="ready-for-prod" ;; *,needs-decision,*) outcome="needs-decision" ;; *,blocked,*) outcome="blocked" ;;
+esac
+[ -n "$limit_line" ] && outcome="session-limit"
+[ -f "$base.json" ] || outcome="${outcome}/no-result"
+
+# Preserve whatever the session left in the tree: a diff file (readable) plus a stash
+# (restorable), so main is clean for the next run and nothing is rescued by hand again
+# (#12, #55 and #70 were, on 2026-09-07).
+if [ -n "$(git -C "$NGM_ROOT" status --short)" ]; then
+  git -C "$NGM_ROOT" add -A -N . 2>/dev/null
+  git -C "$NGM_ROOT" diff > "$base.partial.diff"
+  if git -C "$NGM_ROOT" stash push -u -q -m "pm-run-issue draft #$issue $ts ($outcome)"; then
+    echo "pm-run-issue: uncommitted work preserved in $base.partial.diff and stash 'pm-run-issue draft #$issue $ts' — restore with: git -C \"$NGM_ROOT\" stash pop"
+  fi
+fi
+
+# One line per run for the retrospective (retro/metrics.js reads it; the PM pastes the row into #31).
+node -e '
+  const fs=require("fs");const [csv,json,issue,ts,ended,model,outcome,log]=process.argv.slice(1);
+  let j={};try{j=JSON.parse(fs.readFileSync(json,"utf8"))}catch{}
+  const L=fs.existsSync(log)?fs.readFileSync(log,"utf8").split("\n").filter(l=>/^\d\d:\d\d:\d\d /.test(l)):[];
+  const s=t=>{const [h,m,x]=t.split(":").map(Number);return h*3600+m*60+x};
+  const wall=L.length?((s(L[L.length-1].slice(0,8))-s(L[0].slice(0,8))+86400)%86400):"";
+  const mu=j.modelUsage||{};const sum=k=>Object.values(mu).reduce((a,u)=>a+(u[k]||0),0);
+  const row=[issue,ts,ended,model,outcome,j.num_turns??"",wall,j.total_cost_usd??"",sum("outputTokens"),sum("cacheCreationInputTokens"),sum("cacheReadInputTokens"),(j.permission_denials||[]).length,L.filter(l=>/ TOOL Agent /.test(l)).length,Object.keys(mu).join("+")].join(",");
+  if(!fs.existsSync(csv))fs.writeFileSync(csv,"issue,ts,ended,model,outcome,turns,wall_s,cost_usd,out_tokens,cache_create,cache_read,denials,agent_calls,models\n");
+  fs.appendFileSync(csv,row+"\n");' "$run_dir/metrics.csv" "$base.json" "$issue" "$ts" "$ended" "$model" "$outcome" "$base.log" 2>/dev/null || true
+
+if [ -n "$limit_line" ]; then
+  echo
+  echo "!!! pm-run-issue: the session hit the subscription limit: $limit_line"
+  echo "    Wait for the reset, then: cd \"$NGM_ROOT\" && claude -p --resume $session_id \"Continue issue #$issue from where you stopped; read the task file and git status first.\""
+  exit 3
+fi
+
 # A zero exit means the process ended cleanly, NOT that the issue was delivered: a session that
 # ends its turn while "waiting" for a background agent exits 0 having done nothing. The issue's
 # status label is the real outcome — the session must move it off in-progress before finishing.
-final_labels="$(gh issue view "$issue" -R "$REPO" --json labels --jq '[.labels[].name]|join(",")' 2>/dev/null || echo "")"
 case ",${final_labels}," in
   *,ready-for-prod,*|*,needs-decision,*|*,blocked,*) ;;
   *)

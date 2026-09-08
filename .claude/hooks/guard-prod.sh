@@ -37,6 +37,24 @@ agent="$(printf '%s' "$parsed" | node -e 'let d="";process.stdin.on("data",c=>d+
 
 [ -z "$cmd" ] && exit 0
 
+# Heredocs: a document that QUOTES a pipeline command is not a pipeline command. Strip every
+# heredoc body before matching, and refuse to write a large file through Bash at all — Windows
+# rejects long command lines (ENAMETOOLONG lost the #56 design on 2026-09-07) and the Write tool
+# exists for exactly this. Small heredocs (commit messages, short files) still pass.
+heredoc_stats="$(printf '%s' "$cmd" | node -e '
+  let d="";process.stdin.on("data",c=>d+=c);process.stdin.on("end",()=>{
+    const re=/<<-?\s*["\x27]?([A-Za-z_][A-Za-z0-9_]*)["\x27]?[^\n]*\n([\s\S]*?)\n[ \t]*\1(?=\n|$)/g;
+    let m,max=0;while((m=re.exec(d))){max=Math.max(max,m[2].length);}
+    const out=d.replace(re,(all,tag)=>"<<"+tag+" (heredoc body stripped)\n"+tag);
+    process.stdout.write(max+"\n"+out);});' 2>/dev/null)"
+heredoc_max="${heredoc_stats%%$'\n'*}"
+cmd_stripped="${heredoc_stats#*$'\n'}"
+case "$heredoc_max" in ''|*[!0-9]*) heredoc_max=0; cmd_stripped="$cmd" ;; esac
+if [ "$heredoc_max" -gt "${HEREDOC_MAX_BYTES:-2000}" ]; then
+  echo "BLOCKED by guard-prod hook: heredoc body of ${heredoc_max} bytes. Write files with the Write tool, never a heredoc: Windows rejects long command lines (ENAMETOOLONG) and the content is lost." >&2
+  exit 2
+fi
+
 approval_file="${PROD_APPROVAL_FILE:-${CLAUDE_PROJECT_DIR:-$PWD}/.agent-context/.prod-approval}"
 approval_ttl="${PROD_APPROVAL_TTL:-3600}"   # seconds a recorded approval stays valid
 
@@ -44,7 +62,7 @@ block() {
   echo "BLOCKED by guard-prod hook: $1" >&2
   echo "Command: $cmd" >&2
   echo "PROD is the user's decision. DEV changes ship by pushing main; the Orchestrator does that after review." >&2
-  echo "This guard matches the whole command text, quotes and file contents included. If you were only WRITING a file that mentions this command, use the Write tool instead of a heredoc; do not try to work around the guard in Bash." >&2
+  echo "This guard matches the command with heredoc bodies removed. To write a file that mentions a pipeline command, use the Write tool; do not try to work around the guard in Bash." >&2
   exit 2
 }
 
@@ -72,7 +90,7 @@ prod_release() { # reason
   exit 0
 }
 
-lc="$(printf '%s' "$cmd" | tr '[:upper:]' '[:lower:]')"
+lc="$(printf '%s' "$cmd_stripped" | tr '[:upper:]' '[:lower:]')"
 
 # 1. Workflow dispatch or API dispatch naming prod.
 if printf '%s' "$lc" | grep -Eq '(gh[[:space:]]+workflow[[:space:]]+run|/dispatches|actions/workflows)'; then

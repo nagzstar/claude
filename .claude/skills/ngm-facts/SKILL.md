@@ -80,6 +80,14 @@ push` and force pushes unconditionally. A hook "ask" decision cannot do this job
 ignored in auto and bypass modes and by the existing allow rules. Nothing in GitHub enforces
 the boundary (free plan), so the policy of asking first is absolute regardless.
 
+## Validating on DEV
+
+`bash .claude/scripts/dev-probe.sh` signs in as `anon | participant | mentor | admin` from the
+`NGM_DEV_*` environment variables (names in `TEST-ACCOUNTS.md`; values never in the repo) and
+calls REST, RPC and storage on DEV, printing only statuses. `matrix <method> <path>` runs one
+call as all four roles. Use it; never read `.env`, never write a probe script, never grep the
+bundle for keys (all three were denied or reinvented on 2026-09-07).
+
 ## CI/CD principle
 
 Everything deployed goes through a pipeline: `CODE → GITHUB → PIPELINE → ENVIRONMENT`. Never

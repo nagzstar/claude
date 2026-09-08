@@ -116,6 +116,31 @@ prod block 'git push origin main --force-with-lease'
 prod allow 'git push origin main'
 prod allow 'gh run list -R nagzstar/ngm.app'
 prod block 'gh run rerun notanumber'
+# Heredoc bodies are stripped before matching; a large heredoc file write is refused outright.
+prod allow "cat > design.md <<'EOF'
+Rollback: gh workflow run deploy.yml -f environment=prod
+EOF"
+prod allow "git commit -F - <<'MSG'
+Record the prod release (environment=prod dispatch of deploy.yml)
+MSG"
+big="$(node -e 'process.stdout.write("x".repeat(2500))')"
+prod block "cat > .agent-context/tasks/x-design.md <<'EOF'
+$big
+EOF"
+prod block 'gh workflow run deploy.yml -f environment=prod'
+
+agentcall() { # expect headless(0|1) json
+  local exp="$1" rc; printf '%s' "$3" | NGM_HEADLESS="$2" bash .claude/hooks/guard-agent.sh >/dev/null 2>&1; rc=$?
+  if { [ "$exp" = block ] && [ $rc -eq 2 ]; } || { [ "$exp" = allow ] && [ $rc -eq 0 ]; }; then ok; else bad "guard-agent: expected $exp (rc=$rc) for $3"; fi
+}
+agentcall block 1 '{"tool_name":"Agent","tool_input":{"subagent_type":"frontend-engineer","run_in_background":true,"prompt":"TIER: 2"}}'
+agentcall allow 0 '{"tool_name":"Agent","tool_input":{"subagent_type":"frontend-engineer","run_in_background":true,"prompt":"TIER: 2"}}'
+agentcall allow 1 '{"tool_name":"Agent","tool_input":{"subagent_type":"frontend-engineer","prompt":"TIER: 2"}}'
+agentcall block 1 '{"tool_name":"Agent","tool_input":{"subagent_type":"frontend-engineer","model":"opus","prompt":"GOAL: a page"}}'
+agentcall allow 1 '{"tool_name":"Agent","tool_input":{"subagent_type":"backend-engineer","model":"opus","prompt":"TIER: 3 — edits an RLS policy"}}'
+agentcall allow 1 '{"tool_name":"Agent","tool_input":{"subagent_type":"security-reviewer","model":"fable","prompt":"review"}}'
+agentcall allow 1 '{"tool_name":"Agent","tool_input":{"subagent_type":"researcher-architect","model":"fable","prompt":"design"}}'
+grep -q 'guard-agent.sh' .claude/settings.json && ok || bad "settings.json does not register guard-agent.sh on Agent"
 
 paths() { # expect role path
   local exp="$1" role="$2" p="$3" rc
@@ -146,6 +171,10 @@ paths block qa "$N/supabase/migrations/x.sql"
 paths allow researcher "$N/.agent-context/tasks/design.md"
 paths block researcher "$N/app/src/App.tsx"
 paths allow qa "C:/Users/nagaj/AppData/Local/Temp/scratch.txt"
+bigdesign="$(node -e 'process.stdout.write("d".repeat(29000))')"
+printf '{"tool_name":"Write","tool_input":{"file_path":"%s","content":"%s"}}' "$N/.agent-context/tasks/x-design.md" "$bigdesign" | bash .claude/hooks/guard-paths.sh researcher >/dev/null 2>&1; [ $? -eq 2 ] && ok || bad "guard-paths: oversized design was not blocked"
+printf '{"tool_name":"Write","tool_input":{"file_path":"%s","content":"short"}}' "$N/.agent-context/tasks/x-design.md" | bash .claude/hooks/guard-paths.sh researcher >/dev/null 2>&1; [ $? -eq 0 ] && ok || bad "guard-paths: small design blocked"
+printf '{"tool_name":"Write","tool_input":{"file_path":"%s","content":"%s"}}' "$N/.agent-context/tasks/notes.md" "$bigdesign" | bash .claude/hooks/guard-paths.sh researcher >/dev/null 2>&1; [ $? -eq 0 ] && ok || bad "guard-paths: cap applied to a non-design file"
 
 # ---- 5. install manifest + evals -----------------------------------------------------------
 for d in .claude/agents .claude/skills .claude/hooks .claude/scripts .agent-context .agent-context/tasks; do
@@ -187,6 +216,23 @@ grep -q "in-progress|" .claude/scripts/pm-issue.sh && grep -q "^claude|" .claude
 printf "%s" "$p" | grep -q "Report: <the comment" && ok || bad "pm-run-issue prompt does not make the READY FOR PROD comment the report"
 grep -q "^  next)" .claude/scripts/pm-issue.sh && grep -q -- "--queue" .claude/scripts/pm-run-issue.sh && ok || bad "queue runner (pm-issue.sh next / pm-run-issue.sh --queue) missing"
 bash .claude/scripts/pm-run-issue.sh --queue 42 --print-prompt >/dev/null 2>&1 && bad "pm-run-issue accepted --queue with an issue number" || ok
+grep -q "hasTrustDialogAccepted" .claude/scripts/pm-run-issue.sh && ok || bad "pm-run-issue lacks the trust pre-flight"
+grep -q "NGM_HEADLESS=1" .claude/scripts/pm-run-issue.sh && ok || bad "pm-run-issue does not export NGM_HEADLESS"
+grep -q "metrics.csv" .claude/scripts/pm-run-issue.sh && grep -q "stash push" .claude/scripts/pm-run-issue.sh && grep -q "session limit" .claude/scripts/pm-run-issue.sh && ok || bad "pm-run-issue lacks metrics / draft preservation / limit detection"
+bash .claude/scripts/dev-probe.sh >/dev/null 2>&1; [ $? -eq 2 ] && ok || bad "dev-probe.sh without a command should exit 2"
+grep -q "dev-probe.sh" .claude/settings.json && grep -q "dev-probe" .claude/skills/ngm-facts/SKILL.md && grep -q "dev-probe" .claude/agents/qa-engineer.md && ok || bad "dev-probe.sh is not allow-listed / documented / assigned to QA"
+node --check retro/metrics.js 2>/dev/null && ok || bad "retro/metrics.js does not parse"
+
+# ---- 6b. fixed context size (boot cost grows with every prose rule; delete before adding) ------
+cap() { local f="$1" max="$2" n; n="$(wc -c < "$f")"; [ "$n" -le "$max" ] && ok || bad "$f is $n bytes > cap $max"; }
+cap .claude/skills/ngm-standing-rules/SKILL.md 4000
+for s in app-deployment db-deployment infra-deployment; do cap ".claude/skills/$s/SKILL.md" 7500; done
+cap .claude/skills/ngm-project-manager/SKILL.md 20000
+cap .claude/skills/ngm-facts/SKILL.md 8000
+cap .agent-context/tasks/TEMPLATE.md 2800
+cap .agent-context/patterns.md 4000
+cap .agent-context/decisions.md 5000
+for a in .claude/agents/*.md; do cap "$a" 7000; done
 
 # ---- 7. context files the Orchestrator assumes -----------------------------------------------
 for f in .agent-context/patterns.md .agent-context/decisions.md; do

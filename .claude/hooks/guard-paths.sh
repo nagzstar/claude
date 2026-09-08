@@ -13,15 +13,18 @@ set -u
 role="${1:-}"
 input="$(cat)"
 
-path="$(printf '%s' "$input" | node -e '
+parsed="$(printf '%s' "$input" | node -e '
   let d = ""; process.stdin.on("data", c => d += c);
   process.stdin.on("end", () => {
     try {
       const j = JSON.parse(d); const t = j.tool_input || {};
-      process.stdout.write(String(t.file_path || t.notebook_path || ""));
-    } catch (e) { process.stdout.write(""); }
+      const c = String(t.content ?? t.new_string ?? "");
+      process.stdout.write(c.length + " " + String(t.file_path || t.notebook_path || ""));
+    } catch (e) { process.stdout.write("0 "); }
   });
 ' 2>/dev/null)"
+bytes="${parsed%% *}"; path="${parsed#* }"
+case "$bytes" in ''|*[!0-9]*) bytes=0 ;; esac
 
 [ -z "$path" ] && exit 0
 
@@ -78,6 +81,12 @@ case "$role" in
     is_test_file && exit 0
     deny ;;
   researcher)
+    # A design is a decision record, not a book: 28,000 bytes (≈ 400 lines). The five designs
+    # of 2026-09-07 were 62–81 KB and each was read 3–7 times per run.
+    if printf '%s' "$rel" | grep -Eq -- '-design\.md$' && [ "$bytes" -gt "${DESIGN_MAX_BYTES:-28000}" ]; then
+      echo "BLOCKED by guard-paths hook (researcher): the design is ${bytes} bytes; the cap is ${DESIGN_MAX_BYTES:-28000}. Remove restated context and code listings (the engineers write the SQL); keep decisions, contract, authorization, ownership and the AC mapping." >&2
+      exit 2
+    fi
     printf '%s' "$rel" | grep -Eq '^\.agent-context/' && exit 0
     deny ;;
   *)

@@ -94,8 +94,20 @@ else
   lint="PASS (no new problems)"
 fi
 
+# ---- context growth gate ------------------------------------------------------------------
+# The lessons index must stay short enough to be read once at boot (it reached 750 lines and
+# overflowed the Bash output cap on 2026-09-07). Until ngm.app splits it into an index plus
+# lessons/<domain>.md files, the cap is generous; then it drops to 120 (LESSONS_MAX_LINES).
+lessons_gate="n/a"
+lessons_file="$ngm/.agent-context/lessons.md"
+if [ -f "$lessons_file" ]; then
+  l_n="$(wc -l < "$lessons_file")"; l_cap="${LESSONS_MAX_LINES:-800}"
+  if [ "$l_n" -gt "$l_cap" ]; then lessons_gate="FAIL ($l_n lines > $l_cap: fold detail into .agent-context/lessons/<domain>.md, one index line here)"; fail=1
+  else lessons_gate="PASS ($l_n/$l_cap lines)"; fi
+fi
+
 # ---- summary ------------------------------------------------------------------------------
-echo "CHECK-APP  typecheck=$typecheck  build=$build  test=$test_status tests=$tests(baseline $b_tests)  lint=${errs}e/${warns}w (baseline ${b_err}e/${b_warn}w) $lint"
+echo "CHECK-APP  typecheck=$typecheck  build=$build  test=$test_status tests=$tests(baseline $b_tests)  lint=${errs}e/${warns}w (baseline ${b_err}e/${b_warn}w) $lint  lessons=$lessons_gate"
 if [ "$fail" -eq 1 ]; then
   echo "--- failing output (tail) ---"
   [ "$typecheck" = "FAIL" ] && { echo "[typecheck — every one of these must be fixed; there is no baseline]"; tail -40 "$tmp/typecheck.log"; }

@@ -200,7 +200,10 @@ How to propose one:
    the session left the right status label and comment; if it died without them, post the
    comment yourself from the `.json` result and set the status. Then tell the user what
    changed and what they must decide, in ≤ 15 lines with a link to the READY FOR PROD
-   comment — that comment is the report; do not restate it.
+   comment — that comment is the report; do not restate it. Then paste the row that
+   `node retro/metrics.js --issue <n>` prints (from the agent-system repo) into #31; never
+   copy the numbers by hand. A run that exits 3 hit the subscription limit: wait for the
+   reset it names, then resume with the command it printed.
 4. Outcomes:
    - **READY FOR PROD** — report it, then ask exactly **"Shall I deploy this to prod?"**. On an
      explicit yes, do the release yourself as the Orchestrator per `CLAUDE.md` (`prod-approval.sh
