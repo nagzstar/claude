@@ -108,6 +108,12 @@
     "why": "A trigger on a member-writable table is tier 3 for the backend half only; the UI half is routine Sonnet work; no design needed."
   },
   {
+    "id": "small-two-sided-fullstack",
+    "prompt": "Add an optional 'pronouns' text column to profiles (nullable, no policy change) and show it on the profile form and the member card.",
+    "expect": { "tier": 2, "agents": ["fullstack-engineer", "qa-engineer"], "parallel": false, "must_not_invoke": ["researcher-architect", "backend-engineer", "frontend-engineer", "security-reviewer"], "models": { "fullstack-engineer": "claude-sonnet-5" } },
+    "why": "One nullable column and two UI touches, no new policy or function: one fullstack context saves a boot and a handoff; no security surface."
+  },
+  {
     "id": "unsettled-source-decision-68",
     "prompt": "Career pathways: pick a job, see routes, qualifications and resources. The data source is still being discussed (scraped GOV.UK pages vs a curated seed vs an API).",
     "expect": { "tier": 3, "agents": [], "orchestrator_does_it": false, "must_not_invoke": ["researcher-architect", "backend-engineer", "frontend-engineer"], "stops_at": "NEEDS-USER" },

@@ -10,7 +10,7 @@ decide, delegate, review, integrate, report; application code only for trivial c
 |---|---|
 | Environments | local, dev, prod — **only these three** |
 | DEV / PROD | https://dev.nextgenmaher.com / https://nextgenmaher.com |
-| Hosting · DB · CI | Cloudflare Pages (wrangler from CI) · Supabase · GitHub Actions, repo `nagzstar/ngm.app` |
+| Hosting · DB · CI | Cloudflare Pages (wrangler from CI) · Supabase · GitHub Actions (`nagzstar/ngm.app`) |
 | Branch | **`main`** — commit and push directly; no PR, no branch protection, none wanted |
 | DEV authority · PROD authority | **Claude** · **User** |
 | Cost | **Free or as close to free as possible — hard requirement** |
@@ -41,9 +41,8 @@ Detail: skill `ngm-facts`; pipelines: `.agent-context/delivery.md`.
    files (specialists load their own). `security-model.md` only for auth, roles, permissions,
    user data or admin features; `delivery.md` only for CI/CD, environment or release work.
    Each handoff carries the ≤ 5 index lines that apply to that agent's files, verbatim.
-2. Run `bash .claude/scripts/context-drift.sh`. If a context file's sources changed since it
-   was verified, re-verify the relevant part before relying on it (the repo wins; then fix the
-   file).
+2. Run `bash .claude/scripts/context-drift.sh`; if a context file's sources changed since it
+   was verified, re-verify that part first (the repo wins; then fix the file).
 3. **Resume check.** Look for `.agent-context/tasks/*.md` with `Status: IN PROGRESS | IN REVIEW
    | BLOCKED`, and run `git -C NGM_ROOT status --short`. Either means an interrupted session:
    assess the disk against the task log before anything new; never discard it silently.
@@ -63,8 +62,7 @@ PLAN → DELEGATE → EXECUTE → VERIFY → REVIEW → INTEGRATE → COMPLETE
   `.agent-context/patterns.md` when the ticket names a pattern; via `researcher-architect`
   only when no pattern fits or a decision must be agreed (read only its `## 1 Decisions`).
   Create `.agent-context/tasks/<slug>.md` from
-  `TEMPLATE.md` for anything non-trivial, recording the **base commit**
-  (`git -C NGM_ROOT rev-parse HEAD`) for reviewers to diff against.
+  `TEMPLATE.md` for anything non-trivial, with the **base commit** reviewers diff against.
 - **DELEGATE.** One handoff per agent in the `handoff.md` format: paths not contents, numbered
   acceptance criteria, out of scope, read-only files; `model` only when the tier calls for it.
   Parallel only for independent work under a written contract with disjoint files.
@@ -86,9 +84,9 @@ PLAN → DELEGATE → EXECUTE → VERIFY → REVIEW → INTEGRATE → COMPLETE
 - **COMPLETE.** Fill the task file's **Lessons Learnt** (≤ 5 lines) and **Problems Spotted**
   (owner and tier each), mark it DONE with test results and risks, and **commit it** (the
   audit trail). Durable lessons (0–2) become one index line each in ngm.app's `lessons.md`;
-  every out-of-scope problem becomes its own `claude` issue (`pm-issue.sh new`). Update
-  `project.md` / `security-model.md` / `delivery.md` only if architecture genuinely changed.
-  Then report in the format below and ask **"Shall I deploy this to prod?"**.
+  every out-of-scope problem becomes its own `claude` issue (`pm-issue.sh new`). Update the
+  context files only if architecture genuinely changed. Then report in the format below and
+  ask **"Shall I deploy this to prod?"**.
 
 ## Prod release — only after the user's yes
 
@@ -104,7 +102,7 @@ PLAN → DELEGATE → EXECUTE → VERIFY → REVIEW → INTEGRATE → COMPLETE
 
 Backlog = GitHub Issues on `nagzstar/ngm.app`; the `ngm-project-manager` skill is the PM.
 Each item (a `batch` umbrella or a lone ticket) is delivered in a **fresh headless session**
-(`pm-run-issue.sh <n>`, or `--queue` for every ready item in order) — never inside the PM
+(`pm-run-issue.sh <n>`, or `--queue` for the ready items in order) — never inside the PM
 conversation, never two at once, never releasing to prod. The task file carries `Issue: #n`;
 a batch has one task file, one commit per member, one push and one release.
 
@@ -112,8 +110,9 @@ a batch has one task file, one commit per member, one push and one release.
 
 | Agent | Owns (hook-enforced) | Default model | Invoke when |
 |---|---|---|---|
-| `Explore` (built-in) | nothing (read-only) | haiku | locating code, sweeping many files for a conclusion |
-| `researcher-architect` | `.agent-context/` only | claude-fable-5-1 | no `patterns.md` pattern fits and you cannot write the contract, or a design must be agreed; writes the capped design (≤ 28 KB) |
+| `Explore` (built-in) | nothing (read-only) | haiku | locating code; the fact sweep before PLAN |
+| `researcher-architect` | `.agent-context/` only | claude-opus-5 (**Fable** in `MODE: review` of every tier-3/4 design) | no `patterns.md` pattern fits and you cannot write the contract, or a design must be agreed; writes the capped design (≤ 28 KB) |
+| `fullstack-engineer` | `app/src/`, `supabase/` | claude-sonnet-5 | a small two-sided change (≤ ~6 files) with no new policy or definer function |
 | `backend-engineer` | `supabase/`, `terraform/` (+ assigned cross-cutting files) | claude-sonnet-5 | DB, migrations, RLS, edge functions, auth, infrastructure |
 | `frontend-engineer` | `app/src/` | claude-sonnet-5 | components, pages, routing, forms, `AuthContext`, responsive, UX |
 | `deployment-engineer` | `.github/workflows/` | claude-sonnet-5 | the **pipeline itself** must change, or a run must be diagnosed |
@@ -129,9 +128,9 @@ in both handoffs; `guard-paths` enforces it.
 | Tier | Model | Use for |
 |---|---|---|
 | 1 | scripts / `Explore` on haiku | deterministic checks (`check-app`, `check-dev`, `context-drift`), locating code, bulk read-only extraction |
-| 2 | claude-sonnet-5 | routine implementation on an established pattern: a page or component modelled on an existing one; a table + RLS copying an existing policy shape; copy/UX changes; a step added to an existing workflow; functional QA; new tests |
-| 3 | claude-opus-5 | design; security review; **any change to an existing RLS policy or security-definer function**; role mutation; edge-function auth paths; structural `AuthContext` change; pipeline trigger/ordering/gate/identity changes; anything cross-cutting three or more pages; orchestration of tier-3 work |
-| 4 | claude-fable-5-1 | replacing an architectural pattern (e.g. `AuthContext` → react-query); **the mobile-app approach decision**; migrations rewriting policies across every table or backfilling live data; root-cause analysis with no reproduction; anything a tier-3 attempt failed |
+| 2 | claude-sonnet-5 | routine work on an established pattern (`patterns.md`): a page like an existing one; a table + RLS copying a policy shape; copy/UX; a workflow step; functional QA; tests |
+| 3 | claude-opus-5 | design; security review; **any change to an existing RLS policy or security-definer function**; role mutation; edge-function auth paths; structural `AuthContext` change; pipeline trigger, gate or identity changes; anything cross-cutting three or more pages |
+| 4 | claude-fable-5-1 | replacing an architectural pattern; **the mobile-app approach decision**; migrations rewriting policies across every table or backfilling live data; root-cause analysis with no reproduction; anything a tier-3 attempt failed |
 
 Rules:
 - Classify at PLAN; write the tier in the task file. `model` on the `Agent` call raises an
@@ -139,9 +138,9 @@ Rules:
 - Session model: `settings.json` pins Fable here and Opus in `ngm.app`; a headless batch
   session runs on Fable, a lone ticket on Opus. For a tier-4 NGM task from `ngm.app`, ask for
   `/model claude-fable-5-1` before PLAN.
-- **Fable goes where judgement is cheap and decisive, not where tokens are**: the architect
-  and the security reviewer on definer/RLS/trigger changes; engineers, QA and Explore never
-  move above the ladder for their tier (`decisions.md`; judged on ngm.app #31).
+- **Fable goes where judgement is cheap and decisive, not where tokens are**: the architect's
+  review of a design (never its writing) and the security reviewer on definer/RLS/trigger
+  changes; engineers, QA and Explore never move above the ladder (`decisions.md`).
 - Sonnet specialists run at `effort: medium`; a thin result gets one `SendMessage` to the same
   agent naming the gap; a second thin result is re-run with `model: claude-opus-5` in a fresh
   handoff, never with a nudged prompt.
@@ -156,6 +155,8 @@ Rules:
 
 - Frontend bug or UX change → frontend-engineer → qa-engineer.
 - Backend/DB/infra change → backend-engineer → qa-engineer + security-reviewer.
+- Small change on both sides, no new policy → fullstack-engineer → qa-engineer
+  (+ security-reviewer if a trigger or function changes).
 - Feature spanning both, contract clear → backend + frontend **in parallel** against your
   written contract → qa-engineer + security-reviewer.
 - No catalogued pattern and contract unclear → researcher-architect first, then the above.
@@ -189,7 +190,7 @@ the READY FOR PROD comment; nothing is repeated in the chat, the task file or `l
 ```
 ## Completed        what was implemented
 ## Changed          important files/components
-## Testing          what was tested, and the result (check-app summary line)
+## Testing          what was tested and the result (check-app line)
 ## Security         what was validated (or "n/a — no security surface")
 ## Deployment       commit, pipeline run, DEV result, check-dev evidence
 ## Architecture     decisions worth remembering; tier and models used
@@ -197,16 +198,15 @@ the READY FOR PROD comment; nothing is repeated in the chat, the task file or `l
 ## Lessons Learnt   what a future task must know; what would be done differently
 ## Problems Spotted out-of-scope defects, risks or gaps, filed as `claude` issues (#n each)
 ## Approval         APPROVED / NOT APPROVED + why
-## Prod             READY FOR PROD (+ release notes, risks) then "Shall I deploy this to prod?"
-                    / RELEASED TO PROD (+ run ids, evidence) / NOT READY + why
+## Prod             READY FOR PROD (+ notes, risks) then "Shall I deploy this to prod?" / RELEASED TO PROD (+ run ids) / NOT READY + why
 ```
 
 ## Escalation to the user
 
 Ask only when the answer materially changes product behaviour, architecture, cost, security
-posture, irreversible data or a major UX decision, or for a large tier-4 escalation — and
-never about anything `decisions.md` already settles, naming, file placement or component
-choice. Group questions. The prod question is the standing exception.
+posture, irreversible data or a major UX decision — never about anything `decisions.md`
+already settles, naming, file placement or component choice. Group questions. The prod
+question is the standing exception.
 
 ## Standing rules
 

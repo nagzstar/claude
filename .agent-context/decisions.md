@@ -15,7 +15,10 @@ ticket stay on that ticket under `## Decisions`.
 - 2026-09-07 · The delivery order is the pinned "Delivery order" issue: one numbered sequence with titles, agreed with the user; `P1`–`P3` are only a summary of it.
 - 2026-09-07 · A `blocked` ticket is never started, resumed or deployed, whatever its place in the order; only the user lifts a block, by setting the status back to `ready`. The same for `needs-decision`.
 - 2026-09-07 · Work through the ready items: do not ask per item; stop only for a decision only the user can make, or when they asked to be consulted per item.
-- 2026-09-07 · Fable goes where judgement is cheap and decisive: the batch Orchestrator, the architect and the security review of security-definer, RLS-predicate or trigger changes. Engineers, QA and Explore never move above the tier ladder. Judged on ngm.app #31 after the first two batches.
+- 2026-09-07 · Fable goes where judgement is cheap and decisive: the batch Orchestrator and the security review of security-definer, RLS-predicate or trigger changes. Engineers, QA and Explore never move above the tier ladder. Judged on ngm.app #31 after the first two batches.
+- 2026-09-08 · The architect writes the capped design on Opus; Fable reviews it (`MODE: review`, ≤ 40 lines) on every tier-3/4 design. The one Fable-written design cost ≈ 2.8× an Opus one.
+- 2026-09-08 · A small two-sided change with no new policy goes to one `fullstack-engineer` (Sonnet) instead of two engineers; review stays independent.
+- 2026-09-08 · Local migration validation is `check-db.sh` on an embedded Postgres (ngm.app ticket T4), not Docker and not a CI job.
 - 2026-09-07 · Member-submitted content is moderated (pattern P1); anonymity is enforced in the database, not the UI. Storage is private buckets with signed URLs and per-member caps (P2); no public buckets.
 - 2026-09-07 · Auto-moderation ships inert in prod (`auto_approve_enabled` false) until an admin turns it on; the seeded threat rules are reviewed first (#59).
 - 2026-09-08 · The PM conversation runs on the model `settings.json` pins (Opus in `ngm.app`); it is not raised to Fable by hand.

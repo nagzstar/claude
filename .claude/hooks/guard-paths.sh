@@ -4,7 +4,7 @@
 # same file and a reviewer can never "fix" what it reviews.
 #
 #   usage: guard-paths.sh <role>
-#   roles: frontend | backend | deployment | qa | researcher
+#   roles: frontend | backend | fullstack | deployment | qa | researcher
 #
 # Paths outside NGM_ROOT and outside the Claude project directory (temp files) are allowed.
 # Exit 2 blocks the edit with a message; exit 0 allows.
@@ -72,6 +72,14 @@ case "$role" in
       printf '%s' "$rel" | grep -Eq '^app/src/(integrations/supabase/types\.ts|types/index\.ts)$' || deny
     fi
     exit 0 ;;
+  fullstack)
+    # One Sonnet context for a small two-sided change (user decision 2026-09-08): both engineers'
+    # areas, none of the reviewers' or the pipeline's.
+    is_task_file && exit 0
+    printf '%s' "$rel" | grep -Eq '^(\.github|\.claude|\.agent-context)/' && deny
+    printf '%s' "$rel" | grep -Eq '^claude\.md$' && deny
+    printf '%s' "$rel" | grep -Eq '^(app|supabase|terraform)/' && exit 0
+    deny ;;
   deployment)
     is_task_file && exit 0
     printf '%s' "$rel" | grep -Eq '^\.github/' && exit 0

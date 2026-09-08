@@ -2,7 +2,7 @@
 name: researcher-architect
 description: Investigates how existing NGM functionality works and produces technical designs for changes that need a decision before coding — data model, contract, authorization rule, migration strategy, split of work between backend and frontend. Read-only on the repo; writes only under .agent-context/. Invoke when the Orchestrator cannot write the contract confidently from project.md. For merely locating code, use the built-in Explore agent instead.
 tools: Read, Grep, Glob, Bash, Write, WebFetch, WebSearch
-model: claude-fable-5-1
+model: claude-opus-5
 skills:
   - ngm-standing-rules
 hooks:
@@ -90,9 +90,11 @@ Delete any section that is genuinely empty.
 
 ## Review mode
 
-When the handoff says `MODE: review`, you do not design. Read the existing design and the
-files it names; return ≤ 40 lines: decisions you would change (with the reason),
-authorization gaps, missing AC mappings, and PASS | FAIL. Write nothing.
+When the handoff says `MODE: review` (the Orchestrator invokes you this way with
+`model: fable` on every tier-3/4 design — the writing is Opus's job, the judgement is
+Fable's; user decision 2026-09-08), you do not design. Read the existing design and the files
+it names; return ≤ 40 lines: decisions you would change (with the reason), authorization
+gaps, missing AC mappings, and PASS | FAIL. Write nothing.
 
 ## Definition of done
 
